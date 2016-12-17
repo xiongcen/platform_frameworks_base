@@ -458,7 +458,9 @@ public abstract class LayoutInflater {
             final Context inflaterContext = mContext;
             final AttributeSet attrs = Xml.asAttributeSet(parser);
             Context lastContext = (Context) mConstructorArgs[0];
+            // 该mConstructorArgs属性最后会作为参数传递给View的构造函数
             mConstructorArgs[0] = inflaterContext;
+            // 根View
             View result = root;
 
             try {
@@ -474,6 +476,7 @@ public abstract class LayoutInflater {
                             + ": No start tag found!");
                 }
 
+                // 节点名，即API中的控件或者自定义View完整限定名
                 final String name = parser.getName();
                 
                 if (DEBUG) {
@@ -483,6 +486,7 @@ public abstract class LayoutInflater {
                     System.out.println("**************************");
                 }
 
+                // 处理<merge />标签
                 if (TAG_MERGE.equals(name)) {
                     if (root == null || !attachToRoot) {
                         throw new InflateException("<merge /> can be used only with a valid "
@@ -492,6 +496,7 @@ public abstract class LayoutInflater {
                     rInflate(parser, root, inflaterContext, attrs, false);
                 } else {
                     // Temp is the root view that was found in the xml
+                    // 创建该xml布局文件所对应的根View
                     final View temp = createViewFromTag(root, name, inflaterContext, attrs);
 
                     ViewGroup.LayoutParams params = null;
@@ -502,10 +507,12 @@ public abstract class LayoutInflater {
                                     root);
                         }
                         // Create layout params that match root, if supplied
+                        // 根据AttributeSet属性获得一个LayoutParams实例，记住调用者为root
                         params = root.generateLayoutParams(attrs);
                         if (!attachToRoot) {
                             // Set the layout params for temp if we are not
                             // attaching. (If we are, we use addView, below)
+                            // 重新设置temp的LayoutParams
                             temp.setLayoutParams(params);
                         }
                     }
@@ -575,7 +582,7 @@ public abstract class LayoutInflater {
         return false;
     }
 
-    /**
+    /** 获取具体视图的实例对象
      * Low-level function for instantiating a view by name. This attempts to
      * instantiate a view class of the given <var>name</var> found in this
      * LayoutInflater's ClassLoader.
@@ -604,6 +611,10 @@ public abstract class LayoutInflater {
         try {
             Trace.traceBegin(Trace.TRACE_TAG_VIEW, name);
 
+            // 以下功能主要是获取如下三个类对象：
+            // 1.类加载器 ClassLoader
+            // 2.Class对象
+            // 3.类的构造方法句柄constructor
             if (constructor == null) {
                 // Class not found in the cache, see if it's real, and try to add it
                 clazz = mContext.getClassLoader().loadClass(
@@ -639,6 +650,7 @@ public abstract class LayoutInflater {
                 }
             }
 
+            // 传递参数获得该View实例对象
             Object[] args = mConstructorArgs;
             args[1] = attrs;
 
@@ -744,6 +756,7 @@ public abstract class LayoutInflater {
      */
     View createViewFromTag(View parent, String name, Context context, AttributeSet attrs,
             boolean ignoreThemeAttr) {
+        // 节点是否为View，如果是将其重新赋值，形如 <View class="com.qin.xxxView"></View>
         if (name.equals("view")) {
             name = attrs.getAttributeValue(null, "class");
         }
@@ -781,7 +794,9 @@ public abstract class LayoutInflater {
                 final Object lastContext = mConstructorArgs[0];
                 mConstructorArgs[0] = context;
                 try {
+                    // 通过indexOf方法判断是Android API的View，还是自定义View
                     if (-1 == name.indexOf('.')) {
+                        // 自定义View
                         view = onCreateView(parent, name, attrs);
                     } else {
                         view = createView(name, null, attrs);
@@ -821,7 +836,7 @@ public abstract class LayoutInflater {
         rInflate(parser, parent, parent.getContext(), attrs, finishInflate);
     }
 
-    /**
+    /** 递归调用每个子节点
      * Recursive method used to descend down the xml hierarchy and instantiate
      * views, instantiate their children, and then call onFinishInflate().
      * <p>
@@ -843,26 +858,31 @@ public abstract class LayoutInflater {
 
             final String name = parser.getName();
             
-            if (TAG_REQUEST_FOCUS.equals(name)) {
+            if (TAG_REQUEST_FOCUS.equals(name)) {// 处理<requestFocus />标签
                 parseRequestFocus(parser, parent);
-            } else if (TAG_TAG.equals(name)) {
+            } else if (TAG_TAG.equals(name)) {// 处理<tag />标签
                 parseViewTag(parser, parent, attrs);
-            } else if (TAG_INCLUDE.equals(name)) {
+            } else if (TAG_INCLUDE.equals(name)) {// 处理<include />标签
                 if (parser.getDepth() == 0) {
                     throw new InflateException("<include /> cannot be the root element");
                 }
                 parseInclude(parser, context, parent, attrs);
-            } else if (TAG_MERGE.equals(name)) {
+            } else if (TAG_MERGE.equals(name)) {// 处理<merge />标签
                 throw new InflateException("<merge /> must be the root element");
             } else {
+                // 根据节点名构建一个View实例对象
                 final View view = createViewFromTag(parent, name, context, attrs);
                 final ViewGroup viewGroup = (ViewGroup) parent;
+                // 创建一个LayoutParams实例对象
                 final ViewGroup.LayoutParams params = viewGroup.generateLayoutParams(attrs);
+                // 递归调用
                 rInflateChildren(parser, view, attrs, true);
+                // 将该View以特定LayoutParams值添加至父View中
                 viewGroup.addView(view, params);
             }
         }
 
+        // 完成解析过程，回调
         if (finishInflate) {
             parent.onFinishInflate();
         }

@@ -13566,7 +13566,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             final ViewParent p = mParent;
             if (p != null && ai != null && l < r && t < b) {
                 final Rect damage = ai.mTmpInvalRect;
+                // 设置刷新区域
                 damage.set(l, t, r, b);
+                // 传递调用Parent ViewGroup的invalidateChild方法
                 p.invalidateChild(this, damage);
             }
 
@@ -17055,6 +17057,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         int saveCount;
 
         if (!dirtyOpaque) {
+            // 1.绘制View的背景
             drawBackground(canvas);
         }
 
@@ -17064,9 +17067,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         boolean verticalEdges = (viewFlags & FADING_EDGE_VERTICAL) != 0;
         if (!verticalEdges && !horizontalEdges) {
             // Step 3, draw the content
+            // 3.对View的内容进行绘制
             if (!dirtyOpaque) onDraw(canvas);
 
             // Step 4, draw the children
+            // 4.对当前View的所有子View进行绘制，如果当前的View没有子View就不需要进行绘制
             dispatchDraw(canvas);
 
             // Overlay is part of the content and draws beneath Foreground
@@ -17075,6 +17080,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             }
 
             // Step 6, draw decorations (foreground, scrollbars)
+            // 6.对View的各种装饰进行绘制(滚动条，前背景)
             onDrawForeground(canvas);
 
             // we're done...
@@ -17233,11 +17239,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @param canvas Canvas on which to draw the background
      */
     private void drawBackground(Canvas canvas) {
+        // 获取xml中通过android:background属性或者代码中setBackgroundColor()、setBackgroundResource()等方法进行赋值的背景Drawable
         final Drawable background = mBackground;
         if (background == null) {
             return;
         }
 
+        // 根据layout过程确定的view的位置来设置背景的绘制区域
         setBackgroundBounds();
 
         // Attempt to use a display list if requested.
@@ -17256,6 +17264,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         final int scrollX = mScrollX;
         final int scrollY = mScrollY;
         if ((scrollX | scrollY) == 0) {
+            // 调用Drawable的draw()方法来完成背景的绘制工作
             background.draw(canvas);
         } else {
             canvas.translate(scrollX, scrollY);
@@ -17512,10 +17521,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         int oldB = mBottom;
         int oldR = mRight;
 
+        // 实质都是调用setFrame方法把参数分别赋值给mLeft、mTop、mRight和mBottom这几个变量
         boolean changed = isLayoutModeOptical(mParent) ?
                 setOpticalFrame(l, t, r, b) : setFrame(l, t, r, b);
 
+        // 需要重新layout
         if (changed || (mPrivateFlags & PFLAG_LAYOUT_REQUIRED) == PFLAG_LAYOUT_REQUIRED) {
+            // 回调onLayout()
             onLayout(changed, l, t, r, b);
             mPrivateFlags &= ~PFLAG_LAYOUT_REQUIRED;
 
@@ -19651,6 +19663,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         mPrivateFlags |= PFLAG_INVALIDATED;
 
         if (mParent != null && !mParent.isLayoutRequested()) {
+            //由此向ViewParent请求布局
+            //从这个View开始向上一直requestLayout，最终到达ViewRootImpl的requestLayout
             mParent.requestLayout();
         }
         if (mAttachInfo != null && mAttachInfo.mViewRequestingLayout == this) {
@@ -19690,6 +19704,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      *
      * @see #onMeasure(int, int)
      */
+    // final方法不可重载
     public final void measure(int widthMeasureSpec, int heightMeasureSpec) {
         boolean optical = isLayoutModeOptical(this);
         if (optical != isLayoutModeOptical(mParent)) {
@@ -19709,6 +19724,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         // Optimize layout by avoiding an extra EXACTLY pass when the view is
         // already measured as the correct size. In API 23 and below, this
         // extra pass is required to make LinearLayout re-distribute weight.
+        // widthMeasureSpec或heightMeasureSpec发生了变化，specChanged=true
         final boolean specChanged = widthMeasureSpec != mOldWidthMeasureSpec
                 || heightMeasureSpec != mOldHeightMeasureSpec;
         final boolean isSpecExactly = MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.EXACTLY
@@ -19718,8 +19734,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         final boolean needsLayout = specChanged
                 && (sAlwaysRemeasureExactly || !isSpecExactly || !matchesSpecSize);
 
+        // 判断是否需要强制布局
         if (forceLayout || needsLayout) {
             // first clears the measured dimension flag
+            // 清除MEASURED_DIMENSION_SET标记，该标记会在onMeasure()方法后被设置
             mPrivateFlags &= ~PFLAG_MEASURED_DIMENSION_SET;
 
             resolveRtlPropertiesIfNeeded();
@@ -19727,6 +19745,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             int cacheIndex = forceLayout ? -1 : mMeasureCache.indexOfKey(key);
             if (cacheIndex < 0 || sIgnoreMeasureCache) {
                 // measure ourselves, this should set the measured dimension flag back
+                // 回调onMeasure()
                 onMeasure(widthMeasureSpec, heightMeasureSpec);
                 mPrivateFlags3 &= ~PFLAG3_MEASURE_NEEDED_BEFORE_LAYOUT;
             } else {
@@ -19738,6 +19757,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
             // flag not set, setMeasuredDimension() was not invoked, we raise
             // an exception to warn the developer
+            // onMeasure()方法后必须调用setMeasuredDimension()方法，否则会抛出异常
             if ((mPrivateFlags & PFLAG_MEASURED_DIMENSION_SET) != PFLAG_MEASURED_DIMENSION_SET) {
                 throw new IllegalStateException("View with id " + getId() + ": "
                         + getClass().getName() + "#onMeasure() did not set the"
@@ -19745,9 +19765,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                         + " setMeasuredDimension()");
             }
 
+            // 下一步是layout了，添加LAYOUT_REQUIRED标记
             mPrivateFlags |= PFLAG_LAYOUT_REQUIRED;
         }
 
+        // 保存值
         mOldWidthMeasureSpec = widthMeasureSpec;
         mOldHeightMeasureSpec = heightMeasureSpec;
 
@@ -19818,6 +19840,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * bit mask as defined by {@link #MEASURED_SIZE_MASK} and
      * {@link #MEASURED_STATE_TOO_SMALL}.
      */
+    // measure的主要目的就是对View树中的每个View的mMeasuredWidth和mMeasuredHeight进行赋值
     protected final void setMeasuredDimension(int measuredWidth, int measuredHeight) {
         boolean optical = isLayoutModeOptical(this);
         if (optical != isLayoutModeOptical(mParent)) {
@@ -19923,10 +19946,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         int specSize = MeasureSpec.getSize(measureSpec);
 
         switch (specMode) {
-        case MeasureSpec.UNSPECIFIED:
+        case MeasureSpec.UNSPECIFIED:  // 表示该View的大小父视图未定，设置为默认值
             result = size;
             break;
-        case MeasureSpec.AT_MOST:
+        case MeasureSpec.AT_MOST:// 表示该View的大小由父视图指定了
         case MeasureSpec.EXACTLY:
             result = specSize;
             break;
@@ -19945,6 +19968,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      *
      * @return The suggested minimum height of the view.
      */
+    // 建议的最小高度由View的Background尺寸与通过设置View的miniXXX属性共同决定的
     protected int getSuggestedMinimumHeight() {
         return (mBackground == null) ? mMinHeight : max(mMinHeight, mBackground.getMinimumHeight());
 
@@ -19961,6 +19985,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      *
      * @return The suggested minimum width of the view.
      */
+    // 建议的最小宽度由View的Background尺寸与通过设置View的miniXXX属性共同决定的
     protected int getSuggestedMinimumWidth() {
         return (mBackground == null) ? mMinWidth : max(mMinWidth, mBackground.getMinimumWidth());
     }

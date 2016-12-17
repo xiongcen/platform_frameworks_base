@@ -741,6 +741,7 @@ public class LinearLayout extends ViewGroup {
                 mTotalLength = Math.max(totalLength, totalLength + lp.topMargin + lp.bottomMargin);
                 skippedMeasure = true;
             } else {
+                // 如果View的hight值为0，并且设置了android:layout_weight属性，重新纠正其height值为WRAP_CONTENT
                 if (useExcessSpace) {
                     // The heightMode is either UNSPECIFIED or AT_MOST, and
                     // this child is only laid out using excess space. Measure
@@ -1512,17 +1513,23 @@ public class LinearLayout extends ViewGroup {
         int childLeft;
         
         // Where right end of child should go
+        // 计算父窗口推荐的子View的宽
         final int width = right - left;
+        // 计算父窗口推荐的子View右侧位置
         int childRight = width - mPaddingRight;
         
         // Space available for child
+        // child可使用空间大小
         int childSpace = width - paddingLeft - mPaddingRight;
-        
+
+        // 通过ViewGroup的getChildCount方法获取ViewGroup的子View个数
         final int count = getVirtualChildCount();
 
+        // 获取Gravity属性设置
         final int majorGravity = mGravity & Gravity.VERTICAL_GRAVITY_MASK;
         final int minorGravity = mGravity & Gravity.RELATIVE_HORIZONTAL_GRAVITY_MASK;
 
+        // 依据majorGravity计算childTop的位置值
         switch (majorGravity) {
            case Gravity.BOTTOM:
                // mTotalLength contains the padding already
@@ -1540,14 +1547,18 @@ public class LinearLayout extends ViewGroup {
                break;
         }
 
+        // 开始遍历
         for (int i = 0; i < count; i++) {
             final View child = getVirtualChildAt(i);
             if (child == null) {
                 childTop += measureNullChild(i);
             } else if (child.getVisibility() != GONE) {
+                // LinearLayout中其子视图显示的宽和高由measure过程来决定的，
+                // 因此measure过程的意义就是为layout过程提供视图显示范围的参考值
                 final int childWidth = child.getMeasuredWidth();
                 final int childHeight = child.getMeasuredHeight();
-                
+
+                // 获取子View的LayoutParams
                 final LinearLayout.LayoutParams lp =
                         (LinearLayout.LayoutParams) child.getLayoutParams();
                 
@@ -1557,6 +1568,7 @@ public class LinearLayout extends ViewGroup {
                 }
                 final int layoutDirection = getLayoutDirection();
                 final int absoluteGravity = Gravity.getAbsoluteGravity(gravity, layoutDirection);
+                // 依据不同的absoluteGravity计算childLeft位置
                 switch (absoluteGravity & Gravity.HORIZONTAL_GRAVITY_MASK) {
                     case Gravity.CENTER_HORIZONTAL:
                         childLeft = paddingLeft + ((childSpace - childWidth) / 2)
@@ -1578,6 +1590,7 @@ public class LinearLayout extends ViewGroup {
                 }
 
                 childTop += lp.topMargin;
+                // 通过垂直排列计算调用child的layout设置child的位置
                 setChildFrame(child, childLeft, childTop + getLocationOffset(child),
                         childWidth, childHeight);
                 childTop += childHeight + lp.bottomMargin + getNextLocationOffset(child);

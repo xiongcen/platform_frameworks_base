@@ -2343,6 +2343,7 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
     protected ViewGroup generateLayout(DecorView decor) {
         // Apply data from current theme.
 
+        // 1.根据requestFreature()和Activity节点的android:theme="" 设置好 features值
         TypedArray a = getWindowStyle();
 
         if (false) {
@@ -2549,6 +2550,7 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
 
         // Inflate the window decor.
 
+        // 2.根据设定好的 features值，即特定风格属性，选择不同的窗口修饰布局文件
         int layoutResource;
         int features = getLocalFeatures();
         // System.out.println("Features: 0x" + Integer.toHexString(features));
@@ -2609,6 +2611,7 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
             // System.out.println("Simple!");
         }
 
+        // 3.选定了窗口修饰布局文件 ，添加至DecorView对象里，并且指定contentParent值
         mDecor.startChanging();
         mDecor.onResourcesLoaded(mLayoutInflater, layoutResource);
 

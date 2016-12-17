@@ -1039,6 +1039,7 @@ public final class ViewRootImpl implements ViewParent,
         if (!mHandlingLayoutInLayoutRequest) {
             checkThread();
             mLayoutRequested = true;
+            // View调用requestLayout最终层层上传到ViewRootImpl后最终触发了该方法
             scheduleTraversals();
         }
     }
@@ -1096,6 +1097,7 @@ public final class ViewRootImpl implements ViewParent,
             }
         }
 
+        // View调用invalidate()最终层层上传到ViewRootImpl后最终触发了scheduleTraversals()方法
         invalidateRectOnScreen(dirty);
 
         return null;
@@ -1484,6 +1486,7 @@ public final class ViewRootImpl implements ViewParent,
         mWindowAttributesChangesFlag = 0;
 
         Rect frame = mWinFrame;
+        // 2.判断是否是第一次遍历
         if (mFirst) {
             mFullRedrawNeeded = true;
             mLayoutRequested = true;
@@ -1513,6 +1516,7 @@ public final class ViewRootImpl implements ViewParent,
             if (mViewLayoutDirectionInitial == View.LAYOUT_DIRECTION_INHERIT) {
                 host.setLayoutDirection(mLastConfiguration.getLayoutDirection());
             }
+            // 3.如果是第一次遍历，就调用dispatchAttachedToWindow，所有子视图都把mAttachInfo的值复制到自己的mAttachInfo中
             host.dispatchAttachedToWindow(mAttachInfo, 0);
             mAttachInfo.mTreeObserver.dispatchOnWindowAttachedChange(true);
             dispatchApplyInsets(host);
@@ -1521,14 +1525,19 @@ public final class ViewRootImpl implements ViewParent,
         } else {
             desiredWindowWidth = frame.width();
             desiredWindowHeight = frame.height();
+            // 4.如果不是第一次，判断窗口大小是否有变化，如果有，则会将下面三个变量置为true。
             if (desiredWindowWidth != mWidth || desiredWindowHeight != mHeight) {
                 if (DEBUG_ORIENTATION) Log.v(mTag, "View " + host + " resized to: " + frame);
+                // 需要全部重绘
                 mFullRedrawNeeded = true;
+                // 需要重新布局即重新为视图指定位置
                 mLayoutRequested = true;
+                // 窗口大小可能改变
                 windowSizeMayChange = true;
             }
         }
 
+        // 5.如果visibility发生变化，将调用host.dispatchWindowVisibilityChanged将这个变化通知给所有的子视图
         if (viewVisibilityChanged) {
             mAttachInfo.mWindowVisibility = viewVisibility;
             host.dispatchWindowVisibilityChanged(viewVisibility);
@@ -1554,6 +1563,7 @@ public final class ViewRootImpl implements ViewParent,
 
         boolean insetsChanged = false;
 
+        // 首次执行mLayoutRequested会被置为true，窗体变化也会被置为true
         boolean layoutRequested = mLayoutRequested && (!mStopped || mReportNextDraw);
         if (layoutRequested) {
 
@@ -1604,6 +1614,7 @@ public final class ViewRootImpl implements ViewParent,
             }
 
             // Ask host how big it wants to be
+            // 6.测量判断window的大小是否需要改变
             windowSizeMayChange |= measureHierarchy(host, lp, res,
                     desiredWindowWidth, desiredWindowHeight);
         }
@@ -1743,6 +1754,7 @@ public final class ViewRootImpl implements ViewParent,
                     }
                     mChoreographer.mFrameInfo.addFlags(FrameInfo.FLAG_WINDOW_LAYOUT_CHANGED);
                 }
+                // 7.重新分配窗口大小，创建Surface，并打通native层
                 relayoutResult = relayoutWindow(params, viewVisibility, insetsPending);
 
                 if (DEBUG_LAYOUT) Log.v(mTag, "relayout: frame=" + frame.toShortString()
@@ -2021,6 +2033,7 @@ public final class ViewRootImpl implements ViewParent,
                             + " framesChanged=" + framesChanged);
 
                      // Ask host how big it wants to be
+                    // 8.计算视图大小
                     performMeasure(childWidthMeasureSpec, childHeightMeasureSpec);
 
                     // Implementation of weights from WindowManager.LayoutParams
@@ -2066,6 +2079,7 @@ public final class ViewRootImpl implements ViewParent,
         boolean triggerGlobalLayoutListener = didLayout
                 || mAttachInfo.mRecomputeGlobalAttributes;
         if (didLayout) {
+            // 9.将布局放在合适的位置
             performLayout(lp, mWidth, mHeight);
 
             // By this point all views have been sized and positioned
@@ -2208,6 +2222,7 @@ public final class ViewRootImpl implements ViewParent,
                 mPendingTransitions.clear();
             }
 
+            // 10.将视图View对象绘制到屏幕上
             performDraw();
         } else {
             if (isViewVisible) {

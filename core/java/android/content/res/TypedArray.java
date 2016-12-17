@@ -757,7 +757,8 @@ public class TypedArray {
             throw new UnsupportedOperationException(
                     "Failed to resolve attribute at index " + attrIndex + ": " + value);
         }
-
+        // 没有提供layout_weight和layout_height会来到此处，报异常！
+        // 因此布局文件中的View包括自定义View必须加上属性layout_weight和layout_height
         throw new UnsupportedOperationException(getPositionDescription()
                 + ": You must supply a " + name + " attribute.");
     }

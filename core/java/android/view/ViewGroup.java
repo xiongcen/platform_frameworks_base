@@ -4291,6 +4291,7 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
         // therefore, we call requestLayout() on ourselves before, so that the child's request
         // will be blocked at our level
         requestLayout();
+        // 通过调用invalidate(true)去通知触发ViewRootImpl类的performTraversals()方法
         invalidate(true);
         addViewInner(child, index, params, false);
     }
@@ -5239,6 +5240,7 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
                     }
                 }
 
+                // 循环层层上级调用，直到ViewRootImpl会返回null
                 parent = parent.invalidateChildInParent(location, dirty);
                 if (view != null) {
                     // Account for transform on current parent
@@ -6108,8 +6110,10 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
     protected void measureChildWithMargins(View child,
             int parentWidthMeasureSpec, int widthUsed,
             int parentHeightMeasureSpec, int heightUsed) {
+        // 获取子视图的LayoutParams
         final MarginLayoutParams lp = (MarginLayoutParams) child.getLayoutParams();
 
+        // 调整MeasureSpec，通过这两个参数以及子视图本身的LayoutParams来共同决定子视图的测量规格
         final int childWidthMeasureSpec = getChildMeasureSpec(parentWidthMeasureSpec,
                 mPaddingLeft + mPaddingRight + lp.leftMargin + lp.rightMargin
                         + widthUsed, lp.width);
@@ -6117,6 +6121,7 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
                 mPaddingTop + mPaddingBottom + lp.topMargin + lp.bottomMargin
                         + heightUsed, lp.height);
 
+        // 调用子View的measure方法，子View的measure中会回调子View的onMeasure方法
         child.measure(childWidthMeasureSpec, childHeightMeasureSpec);
     }
 
@@ -6133,23 +6138,31 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
      * layout given an exact size.
      *
      * @param spec The requirements for this view
+     *             表示该父View本身的widthMeasureSpec 或 heightMeasureSpec值
      * @param padding The padding of this view for the current dimension and
      *        margins, if applicable
+     *              表示该父View的边距大小，见于android:padding属性 或android:paddingLeft等属性标记
      * @param childDimension How big the child wants to be in the current
      *        dimension
+     *               表示该子View内部LayoutParams属性的值，可以是wrap_content、match_parent、一个精确值
      * @return a MeasureSpec integer for the child
      */
     public static int getChildMeasureSpec(int spec, int padding, int childDimension) {
+        // 获取当前Parent View的Mode和Size
         int specMode = MeasureSpec.getMode(spec);
         int specSize = MeasureSpec.getSize(spec);
 
+        // 获取Parent size与padding差值（也就是Parent剩余大小），若差值小于0直接返回0
         int size = Math.max(0, specSize - padding);
 
+        // 定义返回值存储变量
         int resultSize = 0;
         int resultMode = 0;
 
+        // 依据当前Parent的Mode进行switch分支逻辑
         switch (specMode) {
         // Parent has imposed an exact size on us
+        // 默认Root View的Mode就是EXACTLY
         case MeasureSpec.EXACTLY:
             if (childDimension >= 0) {
                 resultSize = childDimension;
@@ -6205,6 +6218,7 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
             break;
         }
         //noinspection ResourceType
+        // 将mode与size通过MeasureSpec方法整合为32位整数返回
         return MeasureSpec.makeMeasureSpec(resultSize, resultMode);
     }
 
