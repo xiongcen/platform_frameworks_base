@@ -442,13 +442,16 @@ public class BitmapFactory {
         if (opts.inDensity == 0 && value != null) {
             final int density = value.density;
             if (density == TypedValue.DENSITY_DEFAULT) {
+                // 默认为160(对应mdpi)
                 opts.inDensity = DisplayMetrics.DENSITY_DEFAULT;
             } else if (density != TypedValue.DENSITY_NONE) {
+                // 这里density的值如果对应资源目录为hdpi的话，就是240，以此类推
                 opts.inDensity = density;
             }
         }
         
         if (opts.inTargetDensity == 0 && res != null) {
+            // 当前屏幕显示密度
             opts.inTargetDensity = res.getDisplayMetrics().densityDpi;
         }
         
@@ -473,6 +476,7 @@ public class BitmapFactory {
         
         try {
             final TypedValue value = new TypedValue();
+            // 对TypedValue进行赋值，其中包含了原始资源的density等信息
             is = res.openRawResource(id, value);
 
             bm = decodeResourceStream(res, value, is, null, opts);

@@ -265,7 +265,9 @@ static jobject doDecode(JNIEnv* env, SkStreamRewindable* stream, jobject padding
         javaBitmap = env->GetObjectField(options, gOptions_bitmapFieldID);
 
         if (env->GetBooleanField(options, gOptions_scaledFieldID)) {
+            // 原始资源的density，跟随存放目录变化，对应hdpi是240，xhdpi是320，以此类推
             const int density = env->GetIntField(options, gOptions_densityFieldID);
+            // 屏幕的density，三星s6为640
             const int targetDensity = env->GetIntField(options, gOptions_targetDensityFieldID);
             const int screenDensity = env->GetIntField(options, gOptions_screenDensityFieldID);
             if (density != 0 && targetDensity != 0 && density != screenDensity) {
@@ -320,6 +322,9 @@ static jobject doDecode(JNIEnv* env, SkStreamRewindable* stream, jobject padding
         }
     }
 
+    // 所以一张522*686的PNG图片，把它放到drawable-xxhdpi目录下，在三星s6上加载
+    // scaledWidth =  int( 522 * 640 / 480f + 0.5) = int(696.5) = 696
+    // scaledHeight = int( 686 * 640 / 480f + 0.5) = int(915.16666…) = 915
     // Scale is necessary due to density differences.
     if (scale != 1.0f) {
         willScale = true;
@@ -395,6 +400,7 @@ static jobject doDecode(JNIEnv* env, SkStreamRewindable* stream, jobject padding
         // in order to avoid a behavior change.
         bitmapInfo = SkImageInfo::MakeA8(size.width(), size.height());
     }
+    // deodingBitmap是解码出来的bitmap，大小是图片原始的大小
     SkBitmap decodingBitmap;
     if (!decodingBitmap.setInfo(bitmapInfo) ||
             !decodingBitmap.tryAllocPixels(decodeAllocator, colorTable)) {
