@@ -6603,6 +6603,7 @@ public class Activity extends ContextThemeWrapper
 
         mWindow = new PhoneWindow(this, window);
         mWindow.setWindowControllerCallback(this);
+        // 将Window.Callback和Activity关联，事件传递处使用
         mWindow.setCallback(this);
         mWindow.setOnWindowDismissedCallback(this);
         mWindow.getLayoutInflater().setPrivateFactory(this);

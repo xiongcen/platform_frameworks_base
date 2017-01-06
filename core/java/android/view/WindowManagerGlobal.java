@@ -141,6 +141,7 @@ public final class WindowManagerGlobal {
     private final ArrayList<ViewRootImpl> mRoots = new ArrayList<ViewRootImpl>();
     private final ArrayList<WindowManager.LayoutParams> mParams =
             new ArrayList<WindowManager.LayoutParams>();
+    // 存储那些正在被删除的View对象(那些已经调用removeView方法但是还没有删除的Window对象)
     private final ArraySet<View> mDyingViews = new ArraySet<View>();
 
     private Runnable mSystemPropertyUpdater;
@@ -332,12 +333,16 @@ public final class WindowManagerGlobal {
 
             view.setLayoutParams(wparams);
 
+            // mViews存储所有Window对应的View
             mViews.add(view);
+            // mRoots存储所有Window对应的ViewRootImpl
             mRoots.add(root);
+            // mParams存储所有Window对应的布局参数
             mParams.add(wparams);
 
             // do this last because it fires off messages to start doing things
             try {
+                // 通过ViewRootImpl来更新界面并完成Window的添加过程
                 root.setView(view, wparams, panelParentView);
             } catch (RuntimeException e) {
                 // BadTokenException or InvalidDisplayException, clean up.

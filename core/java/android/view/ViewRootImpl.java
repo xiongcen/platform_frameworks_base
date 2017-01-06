@@ -625,6 +625,7 @@ public final class ViewRootImpl implements ViewParent,
                 // Schedule the first layout -before- adding to the window
                 // manager, to make sure we do the relayout before receiving
                 // any other events from the system.
+                // 注释意思：在添加Window之前完成第一次layout布局过程，以确保在收到任何系统事件后面重新布局
                 requestLayout();
                 if ((mWindowAttributes.inputFeatures
                         & WindowManager.LayoutParams.INPUT_FEATURE_NO_INPUT_CHANNEL) == 0) {
@@ -636,6 +637,7 @@ public final class ViewRootImpl implements ViewParent,
                     mOrigWindowType = mWindowAttributes.type;
                     mAttachInfo.mRecomputeGlobalAttributes = true;
                     collectViewAttributes();
+                    // 最终通过WindowSession最终完成Window的添加过程
                     res = mWindowSession.addToDisplay(mWindow, mSeq, mWindowAttributes,
                             getHostVisibility(), mDisplay.getDisplayId(),
                             mAttachInfo.mContentInsets, mAttachInfo.mStableInsets,
@@ -6174,6 +6176,7 @@ public final class ViewRootImpl implements ViewParent,
 
     void doProcessInputEvents() {
         // Deliver all pending input events in the queue.
+        // 逐个分发输入事件队列中的事件
         while (mPendingInputEventHead != null) {
             QueuedInputEvent q = mPendingInputEventHead;
             mPendingInputEventHead = q.mNext;
@@ -6196,6 +6199,7 @@ public final class ViewRootImpl implements ViewParent,
             }
             mChoreographer.mFrameInfo.updateInputEventTime(eventTime, oldestEventTime);
 
+            // 具体通过该方法分发事件
             deliverInputEvent(q);
         }
 

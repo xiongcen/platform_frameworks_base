@@ -171,6 +171,7 @@ final class Session extends IWindowSession.Stub
     public int addToDisplay(IWindow window, int seq, WindowManager.LayoutParams attrs,
             int viewVisibility, int displayId, Rect outContentInsets, Rect outStableInsets,
             Rect outOutsets, InputChannel outInputChannel) {
+        // 通过WindowManagerService完成Window的添加
         return mService.addWindow(this, window, seq, attrs, viewVisibility, displayId,
                 outContentInsets, outStableInsets, outOutsets, outInputChannel);
     }
