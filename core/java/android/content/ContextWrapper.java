@@ -49,6 +49,7 @@ import java.io.InputStream;
  * the original Context.
  */
 public class ContextWrapper extends Context {
+    // 该属性指向一个ContextImpl实例，一般在创建Application、Service、Activity时赋值
     Context mBase;
 
     public ContextWrapper(Context base) {
@@ -56,6 +57,7 @@ public class ContextWrapper extends Context {
     }
     
     /**
+     * 创建Application、Service、Activity，会调用该方法给mBase属性赋值
      * Set the base context for this ContextWrapper.  All calls will then be
      * delegated to the base context.  Throws
      * IllegalStateException if a base context has already been set.

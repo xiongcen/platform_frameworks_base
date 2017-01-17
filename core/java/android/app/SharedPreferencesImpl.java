@@ -202,6 +202,7 @@ final class SharedPreferencesImpl implements SharedPreferences {
             // thread and otherwise ignored by StrictMode.
             BlockGuard.getThreadPolicy().onReadFromDisk();
         }
+        // mLoaded只有在loadFromDisk()方法调用完成才能被置为true退出循环
         while (!mLoaded) {
             try {
                 wait();
@@ -387,13 +388,17 @@ final class SharedPreferencesImpl implements SharedPreferences {
             notifyListeners(mcr);
         }
 
+        // 将数据提交到内存的关键方法
         // Returns true if any changes were made
         private MemoryCommitResult commitToMemory() {
             MemoryCommitResult mcr = new MemoryCommitResult();
+            // 使用SharedPreferencesImpl.this锁，和读数据使用的锁一致，所以对于内存来说
+            // 对SharedPreferences的读写操作是线程安全的
             synchronized (SharedPreferencesImpl.this) {
                 // We optimistically don't make a deep copy until
                 // a memory commit comes in when we're already
                 // writing to disk.
+                // mDiskWritesInFlight表示正在等待写的操作数量
                 if (mDiskWritesInFlight > 0) {
                     // We can't modify our mMap as a currently
                     // in-flight write owns it.  Clone it before
@@ -402,6 +407,7 @@ final class SharedPreferencesImpl implements SharedPreferences {
                     mMap = new HashMap<String, Object>(mMap);
                 }
                 mcr.mapToWriteToDisk = mMap;
+                // mDiskWritesInFlight++表示正在等待写的操作加1
                 mDiskWritesInFlight++;
 
                 boolean hasListeners = mListeners.size() > 0;
@@ -411,7 +417,12 @@ final class SharedPreferencesImpl implements SharedPreferences {
                             new HashSet<OnSharedPreferenceChangeListener>(mListeners.keySet());
                 }
 
+                // 搞清楚两个概念，mMap是存放当前SharedPreferences文件中的键值对，而mModified是存放此时edit时put进去的键值对
+
                 synchronized (this) {
+                    // 先处理clear标识，它调用的是mMap.clear()，然后再遍历mModified将新的键值对put进mMap。
+                    // 注意：在一次commit事务中，如果同时put一些键值对和调用clear，
+                    // 那么clear掉的只是之前的键值对，这次put进去的键值对还是会被写入的。
                     if (mClear) {
                         if (!mMap.isEmpty()) {
                             mcr.changesMade = true;
@@ -427,6 +438,7 @@ final class SharedPreferencesImpl implements SharedPreferences {
                         // setting a value to "null" for a given key is specified to be
                         // equivalent to calling remove on that key.
                         if (v == this || v == null) {
+                            // 特殊情况，如果一个键值对的value是this（SharedPreferencesImpl）或者是null那么表示将此键值对删除
                             if (!mMap.containsKey(k)) {
                                 continue;
                             }
@@ -512,17 +524,22 @@ final class SharedPreferencesImpl implements SharedPreferences {
         final Runnable writeToDiskRunnable = new Runnable() {
                 public void run() {
                     synchronized (mWritingToDiskLock) {
+                        // 写文件
                         writeToFile(mcr);
                     }
                     synchronized (SharedPreferencesImpl.this) {
+                        // mDiskWritesInFlight--表示正在等待写的操作减1
                         mDiskWritesInFlight--;
                     }
+                    // 调用commit()时，postWriteRunnable==null
+                    // 调用apply()时，postWriteRunnable!=null
                     if (postWriteRunnable != null) {
                         postWriteRunnable.run();
                     }
                 }
             };
 
+        // 判断是否是commit()提交
         final boolean isFromSyncCommit = (postWriteRunnable == null);
 
         // Typical #commit() path with fewer allocations, doing a write on
@@ -532,12 +549,15 @@ final class SharedPreferencesImpl implements SharedPreferences {
             synchronized (SharedPreferencesImpl.this) {
                 wasEmpty = mDiskWritesInFlight == 1;
             }
+            // 如果是commit()提交，并且只有一个写操作等待，则直接调用writeToDiskRunnable.run()，否则阻塞
+            // 注意：这个调用是在当前线程中进行的
             if (wasEmpty) {
                 writeToDiskRunnable.run();
                 return;
             }
         }
 
+        // 如果是apply()提交，则使用线程池异步执行写操作
         QueuedWork.singleThreadExecutor().execute(writeToDiskRunnable);
     }
 

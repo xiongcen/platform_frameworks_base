@@ -362,6 +362,7 @@ class ContextImpl extends Context {
     public SharedPreferences getSharedPreferences(File file, int mode) {
         checkMode(mode);
         SharedPreferencesImpl sp;
+        // 单例模式
         synchronized (ContextImpl.class) {
             final ArrayMap<File, SharedPreferencesImpl> cache = getSharedPreferencesCacheLocked();
             sp = cache.get(file);
