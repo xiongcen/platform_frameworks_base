@@ -90,6 +90,8 @@ public final class WindowManagerImpl implements WindowManager {
     @Override
     public void addView(@NonNull View view, @NonNull ViewGroup.LayoutParams params) {
         applyDefaultToken(params);
+        // mParentWindow是Activity中获取WindowManagerImpl实例化时传入的当前Window
+        // view是Activity中最顶层的mDecor
         mGlobal.addView(view, params, mContext.getDisplay(), mParentWindow);
     }
 

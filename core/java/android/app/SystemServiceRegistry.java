@@ -555,10 +555,12 @@ final class SystemServiceRegistry {
                 return new EthernetManager(ctx.getOuterContext(), service);
             }});
 
+        // WINDOW_SERVICE的注册
         registerService(Context.WINDOW_SERVICE, WindowManager.class,
                 new CachedServiceFetcher<WindowManager>() {
             @Override
             public WindowManager createService(ContextImpl ctx) {
+                // 返回一个WindowManagerImpl实例
                 return new WindowManagerImpl(ctx);
             }});
 
@@ -802,6 +804,7 @@ final class SystemServiceRegistry {
     /**
      * Statically registers a system service with the context.
      * This method must be called during static initialization only.
+     * 上面static代码块创建WindowManagerImpl实例用到的方法
      */
     private static <T> void registerService(String serviceName, Class<T> serviceClass,
             ServiceFetcher<T> serviceFetcher) {

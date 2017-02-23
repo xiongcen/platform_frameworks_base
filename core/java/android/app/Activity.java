@@ -5110,7 +5110,11 @@ public class Activity extends ContextThemeWrapper
 
     void makeVisible() {
         if (!mWindowAdded) {
+            // 也就是获取Activity的mWindowManager
+            // 这个mWindowManager是在Activity的attach中通过mWindow.getWindowManager()获得
             ViewManager wm = getWindowManager();
+            // 调用的实质就是ViewManager接口的addView方法，传入的是mDecorView
+            // getWindow().getAttributes()==>Activity窗体的WindowManager.LayoutParams类型是TYPE_APPLICATION的
             wm.addView(mDecor, getWindow().getAttributes());
             mWindowAdded = true;
         }
@@ -6601,6 +6605,7 @@ public class Activity extends ContextThemeWrapper
 
         mFragments.attachHost(null /*parent*/);
 
+        // 创建Window类型的mWindow对象，实际为PhoneWindow类实现了抽象Window类
         mWindow = new PhoneWindow(this, window);
         mWindow.setWindowControllerCallback(this);
         // 将Window.Callback和Activity关联，事件传递处使用
@@ -6637,6 +6642,7 @@ public class Activity extends ContextThemeWrapper
             }
         }
 
+        // 通过抽象Window类的setWindowManager方法给Window类的成员变量WindowManager赋值实例化
         mWindow.setWindowManager(
                 (WindowManager)context.getSystemService(Context.WINDOW_SERVICE),
                 mToken, mComponent.flattenToString(),

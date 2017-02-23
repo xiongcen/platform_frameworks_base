@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
+ * 窗口分析http://www.jcodecraeer.com/a/anzhuokaifa/androidkaifa/2015/0615/3044.html
  * The interface that apps use to talk to the window manager.
  * <p>
  * Use <code>Context.getSystemService(Context.WINDOW_SERVICE)</code> to get one of these.
@@ -165,6 +166,7 @@ public interface WindowManager extends ViewManager {
          * X position for this window.  With the default gravity it is ignored.
          * When using {@link Gravity#LEFT} or {@link Gravity#START} or {@link Gravity#RIGHT} or
          * {@link Gravity#END} it provides an offset from the given edge.
+         * 窗口的绝对X位置，需要考虑gravity属性
          */
         @ViewDebug.ExportedProperty
         public int x;
@@ -173,6 +175,7 @@ public interface WindowManager extends ViewManager {
          * Y position for this window.  With the default gravity it is ignored.
          * When using {@link Gravity#TOP} or {@link Gravity#BOTTOM} it provides
          * an offset from the given edge.
+         * 窗口的绝对Y位置，需要考虑gravity属性
          */
         @ViewDebug.ExportedProperty
         public int y;
@@ -182,6 +185,7 @@ public interface WindowManager extends ViewManager {
          * to the view associated with these LayoutParams. Specify 0 if the view
          * should not be stretched. Otherwise the extra pixels will be pro-rated
          * among all views whose weight is greater than 0.
+         * 在横方向上为相关的View预留多少扩展像素，如果是0则此view不能被拉伸，其他情况下扩展像素被widget均分
          */
         @ViewDebug.ExportedProperty
         public float horizontalWeight;
@@ -191,6 +195,7 @@ public interface WindowManager extends ViewManager {
          * to the view associated with these LayoutParams. Specify 0 if the view
          * should not be stretched. Otherwise the extra pixels will be pro-rated
          * among all views whose weight is greater than 0.
+         * 在纵方向上为相关的View预留多少扩展像素，如果是0则此view不能被拉伸，其他情况下扩展像素被widget均分
          */
         @ViewDebug.ExportedProperty
         public float verticalWeight;
@@ -283,10 +288,16 @@ public interface WindowManager extends ViewManager {
             @ViewDebug.IntToString(from = TYPE_QS_DIALOG, to = "TYPE_QS_DIALOG"),
             @ViewDebug.IntToString(from = TYPE_SCREENSHOT, to = "TYPE_SCREENSHOT")
         })
+        // 窗口类型
+        // 有3种主要类型如下：
+        // ApplicationWindows取值在FIRST_APPLICATION_WINDOW与LAST_APPLICATION_WINDOW之间，是常用的顶层应用程序窗口，需将token设置成Activity的token；
+        // SubWindows取值在FIRST_SUB_WINDOW和LAST_SUB_WINDOW之间，与顶层窗口相关联，需将token设置成它所附着宿主窗口的token；
+        // SystemWindows取值在FIRST_SYSTEM_WINDOW和LAST_SYSTEM_WINDOW之间，不能用于应用程序，使用时需要有特殊权限，它是特定的系统功能才能使用；
         public int type;
 
         /**
          * Start of window types that represent normal application windows.
+         * WindowType：开始应用程序窗口
          */
         public static final int FIRST_APPLICATION_WINDOW = 1;
 
@@ -295,6 +306,7 @@ public interface WindowManager extends ViewManager {
          * of the overall application; all other application windows will
          * appear on top of it.
          * In multiuser systems shows only on the owning user's window.
+         * WindowType：所有程序窗口的base窗口，其他应用程序窗口都显示在它上面
          */
         public static final int TYPE_BASE_APPLICATION   = 1;
 
@@ -302,6 +314,7 @@ public interface WindowManager extends ViewManager {
          * Window type: a normal application window.  The {@link #token} must be
          * an Activity token identifying who the window belongs to.
          * In multiuser systems shows only on the owning user's window.
+         * 普通应用程序窗口，token必须设置为Activity的token来指定窗口属于谁
          */
         public static final int TYPE_APPLICATION        = 2;
 
@@ -401,6 +414,7 @@ public interface WindowManager extends ViewManager {
          * These windows are normally placed above all applications, but behind
          * the status bar.
          * In multiuser systems shows on all users' windows.
+         * WindowType：电话窗口，它用于电话交互（特别是呼入），置于所有应用程序之上，状态栏之下
          */
         public static final int TYPE_PHONE              = FIRST_SYSTEM_WINDOW+2;
 

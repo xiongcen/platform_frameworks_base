@@ -167,7 +167,9 @@ public class Dialog implements DialogInterface, Window.Callback,
     }
 
     Dialog(@NonNull Context context, @StyleRes int themeResId, boolean createContextThemeWrapper) {
+        // 默认构造函数的createContextThemeWrapper为true
         if (createContextThemeWrapper) {
+            // 默认构造函数的theme=0
             if (themeResId == 0) {
                 final TypedValue outValue = new TypedValue();
                 context.getTheme().resolveAttribute(R.attr.dialogTheme, outValue, true);
@@ -177,13 +179,19 @@ public class Dialog implements DialogInterface, Window.Callback,
         } else {
             mContext = context;
         }
+        // mContext已经从外部传入的context对象获得值（一般是个Activity）！！！
 
+        // 获取WindowManager对象
         mWindowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
 
+        // 为Dialog创建新的Window
         final Window w = new PhoneWindow(mContext);
         mWindow = w;
+        // Dialog能够接受到按键事件的原因
         w.setCallback(this);
         w.setOnWindowDismissedCallback(this);
+        // 关联WindowManager与新Window，特别注意第二个参数token为null，也就是说Dialog没有自己的token
+        // 一个Window属于Dialog的话，那么该Window的mAppToken对象是null
         w.setWindowManager(mWindowManager, null, null);
         w.setGravity(Gravity.CENTER);
 
@@ -290,10 +298,12 @@ public class Dialog implements DialogInterface, Window.Callback,
         mCanceled = false;
         
         if (!mCreated) {
+            // 回调Dialog的onCreate方法
             dispatchOnCreate(null);
         }
 
         onStart();
+        // 类似于Activity，获取当前新Window的DecorView对象，所以有一种自定义Dialog布局的方式就是重写Dialog的onCreate方法，使用setContentView传入布局
         mDecor = mWindow.getDecorView();
 
         if (mActionBar == null && mWindow.hasFeature(Window.FEATURE_ACTION_BAR)) {
@@ -302,7 +312,8 @@ public class Dialog implements DialogInterface, Window.Callback,
             mWindow.setDefaultLogo(info.logo);
             mActionBar = new WindowDecorActionBar(this);
         }
-
+        // 获取新Window的WindowManager.LayoutParams参数，和Activity一样type为TYPE_APPLICATION
+        WindowManager.LayoutParams l = mWindow.getAttributes();
         WindowManager.LayoutParams l = mWindow.getAttributes();
         if ((l.softInputMode
                 & WindowManager.LayoutParams.SOFT_INPUT_IS_FORWARD_NAVIGATION) == 0) {
@@ -313,6 +324,7 @@ public class Dialog implements DialogInterface, Window.Callback,
             l = nl;
         }
 
+        //把一个View添加到Activity共用的windowManager里面去
         mWindowManager.addView(mDecor, l);
         mShowing = true;
 

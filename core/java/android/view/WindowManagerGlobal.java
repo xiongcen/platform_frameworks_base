@@ -272,8 +272,9 @@ public final class WindowManagerGlobal {
         if (!(params instanceof WindowManager.LayoutParams)) {
             throw new IllegalArgumentException("Params must be WindowManager.LayoutParams");
         }
-
+        // 获取Activity的Window的getWindow().getAttributes()的LayoutParams
         final WindowManager.LayoutParams wparams = (WindowManager.LayoutParams) params;
+        // 如果是Activity中调用的，parentWindow=Window，如果不是Activity的，譬如是Context的静态代码块的实例化则parentWindow为null
         if (parentWindow != null) {
             parentWindow.adjustLayoutParamsForSubWindow(wparams);
         } else {
@@ -328,7 +329,7 @@ public final class WindowManagerGlobal {
                     }
                 }
             }
-
+            // 为当前Window创建ViewRoot
             root = new ViewRootImpl(view.getContext(), display);
 
             view.setLayoutParams(wparams);
