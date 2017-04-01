@@ -19737,7 +19737,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         // 判断是否需要强制布局
         if (forceLayout || needsLayout) {
             // first clears the measured dimension flag
-            // 清除MEASURED_DIMENSION_SET标记，该标记会在onMeasure()方法后被设置
+            // 清除已测量的标识位PFLAG_MEASURED_DIMENSION_SET，该标记会在setMeasuredDimension()方法后被设置
             mPrivateFlags &= ~PFLAG_MEASURED_DIMENSION_SET;
 
             resolveRtlPropertiesIfNeeded();
@@ -19851,6 +19851,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             measuredWidth  += optical ? opticalWidth  : -opticalWidth;
             measuredHeight += optical ? opticalHeight : -opticalHeight;
         }
+        // 保存值并添加已测量标识
         setMeasuredDimensionRaw(measuredWidth, measuredHeight);
     }
 
@@ -19870,6 +19871,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         mMeasuredWidth = measuredWidth;
         mMeasuredHeight = measuredHeight;
 
+        // 重新将已测量标识位存入mPrivateFlags标识测量的完成
         mPrivateFlags |= PFLAG_MEASURED_DIMENSION_SET;
     }
 
@@ -19941,10 +19943,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @return The size this view should be.
      */
     public static int getDefaultSize(int size, int measureSpec) {
+        // 将我们获得的最小值赋给result
         int result = size;
         int specMode = MeasureSpec.getMode(measureSpec);
         int specSize = MeasureSpec.getSize(measureSpec);
 
+        // 根据测量规格模式确定最终的测量尺寸
         switch (specMode) {
         case MeasureSpec.UNSPECIFIED:  // 表示该View的大小父视图未定，设置为默认值
             result = size;

@@ -2025,6 +2025,7 @@ public final class ViewRootImpl implements ViewParent,
                 if (focusChangedDueToTouchMode || mWidth != host.getMeasuredWidth()
                         || mHeight != host.getMeasuredHeight() || framesChanged ||
                         updatedConfiguration) {
+                    // lp.width和lp.height均为MATCH_PARENT，其在mWindowAttributes（WindowManager.LayoutParams类型）将值赋予给lp时就已被确定
                     int childWidthMeasureSpec = getRootMeasureSpec(mWidth, lp.width);
                     int childHeightMeasureSpec = getRootMeasureSpec(mHeight, lp.height);
 
@@ -2498,10 +2499,12 @@ public final class ViewRootImpl implements ViewParent,
      *
      * @param windowSize
      *            The available width or height of the window
+     *            表示当前窗口的大小
      *
      * @param rootDimension
      *            The layout params for one dimension (width or height) of the
      *            window.
+     *
      *
      * @return The measure spec to use to measure the root view.
      */
@@ -2511,14 +2514,17 @@ public final class ViewRootImpl implements ViewParent,
 
         case ViewGroup.LayoutParams.MATCH_PARENT:
             // Window can't resize. Force root view to be windowSize.
+            // Window不能调整其大小，强制使根视图大小与Window一致
             measureSpec = MeasureSpec.makeMeasureSpec(windowSize, MeasureSpec.EXACTLY);
             break;
         case ViewGroup.LayoutParams.WRAP_CONTENT:
             // Window can resize. Set max size for root view.
+            // Window可以调整其大小，为根视图设置一个最大值
             measureSpec = MeasureSpec.makeMeasureSpec(windowSize, MeasureSpec.AT_MOST);
             break;
         default:
             // Window wants to be an exact size. Force root view to be that size.
+            // Window想要一个确定的尺寸，强制将根视图的尺寸作为其尺寸
             measureSpec = MeasureSpec.makeMeasureSpec(rootDimension, MeasureSpec.EXACTLY);
             break;
         }
