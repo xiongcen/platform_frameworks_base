@@ -1302,6 +1302,7 @@ public class NotificationManagerService extends SystemService {
                                  final ToastRecord r = mToastQueue.get(i);
                                  if (r.pkg.equals(pkg)) {
                                      count++;
+                                     // 普通应用的Toast显示数量是有限制的，为50
                                      if (count >= MAX_PACKAGE_NOTIFICATIONS) {
                                          Slog.e(TAG, "Package has already posted " + count
                                                 + " toasts. Not showing more. Package=" + pkg);
@@ -1314,6 +1315,7 @@ public class NotificationManagerService extends SystemService {
                         record = new ToastRecord(callingPid, pkg, callback, duration);
                         mToastQueue.add(record);
                         index = mToastQueue.size() - 1;
+                        // 将当前Toast所在的进程设置为前台进程
                         keepProcessAliveLocked(callingPid);
                     }
                     // If it's at index 0, it's the current toast.  It doesn't matter if it's
@@ -1321,6 +1323,7 @@ public class NotificationManagerService extends SystemService {
                     // If the callback fails, this will remove it from the list, so don't
                     // assume that it's valid after this.
                     if (index == 0) {
+                        // 如果index=0，说明当前入队的Toast在队头，需要调用showNextToastLocked方法直接显示
                         showNextToastLocked();
                     }
                 } finally {
@@ -2992,13 +2995,16 @@ public class NotificationManagerService extends SystemService {
         while (record != null) {
             if (DBG) Slog.d(TAG, "Show pkg=" + record.pkg + " callback=" + record.callback);
             try {
+                // 通知进程显示
                 record.callback.show();
+                // 超时自动取消逻辑
                 scheduleTimeoutLocked(record);
                 return;
             } catch (RemoteException e) {
                 Slog.w(TAG, "Object died trying to show notification " + record.callback
                         + " in package " + record.pkg);
                 // remove it from the list and let the process die
+                // 如果出现异常则移除该record
                 int index = mToastQueue.indexOf(record);
                 if (index >= 0) {
                     mToastQueue.remove(index);
@@ -3016,6 +3022,7 @@ public class NotificationManagerService extends SystemService {
     void cancelToastLocked(int index) {
         ToastRecord record = mToastQueue.get(index);
         try {
+            // 结束显示
             record.callback.hide();
         } catch (RemoteException e) {
             Slog.w(TAG, "Object died trying to hide notification " + record.callback
@@ -3023,6 +3030,7 @@ public class NotificationManagerService extends SystemService {
             // don't worry about this, we're about to remove it from
             // the list anyway
         }
+        // 从消息队列移除
         mToastQueue.remove(index);
         keepProcessAliveLocked(record.pid);
         if (mToastQueue.size() > 0) {
@@ -3080,6 +3088,10 @@ public class NotificationManagerService extends SystemService {
             }
         }
         try {
+            /**
+             * 将当前Toast所在进程设置为前台进程，这里的mAm = ActivityManager.getService()，调用了setProcessImportant方法将当前pid的进程置为前台进程，保证不会系统杀死。
+             * 这也就解释了为什么当我们finish当前Activity时，Toast还可以显示，因为当前进程还在执行。
+             */
             mAm.setProcessForeground(mForegroundToken, pid, toastCount > 0);
         } catch (RemoteException e) {
             // Shouldn't happen.

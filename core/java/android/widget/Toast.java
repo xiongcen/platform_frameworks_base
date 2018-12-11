@@ -425,6 +425,7 @@ public class Toast {
                 mParams.removeTimeoutMilliseconds = mDuration ==
                     Toast.LENGTH_LONG ? LONG_DURATION_TIMEOUT : SHORT_DURATION_TIMEOUT;
                 if (mView.getParent() != null) {
+                    // 当把Toast的View添加之前发现该View已经被添加过(有parent)，则删除
                     if (localLOGV) Log.v(TAG, "REMOVE! " + mView + " in " + this);
                     mWM.removeView(mView);
                 }
