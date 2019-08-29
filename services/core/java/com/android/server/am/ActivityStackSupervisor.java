@@ -822,6 +822,12 @@ public final class ActivityStackSupervisor implements DisplayListener {
         return resumedActivity;
     }
 
+    /**
+     * 该方法遍历 ActivityStack 和 TaskRecord，
+     * 找到位于 Activity 堆栈顶端的一个 ActivityRecord 对象 hr，
+     * 接着检查这个 Activity 组件的用户 ID 和 进程名是否与 ProcessRecord 对象 app 所描述的应用程序的用户 ID 和进程名一致，
+     * 如果一致，则调用 StackSupervisor.realStartActivityLocked方法来请求该应用程序进程启动一个 Activity 组件。
+     */
     boolean attachApplicationLocked(ProcessRecord app) throws RemoteException {
         final String processName = app.processName;
         boolean didSomething = false;
@@ -1272,6 +1278,7 @@ public final class ActivityStackSupervisor implements DisplayListener {
                 app.pendingUiClean = true;
             }
             app.forceProcessStateUpTo(mService.mTopProcessState);
+            // ******* 重要！调度 Activity ，其中thread是ApplicationThread类型，binder对象。
             app.thread.scheduleLaunchActivity(new Intent(r.intent), r.appToken,
                     System.identityHashCode(r), r.info, new Configuration(mService.mConfiguration),
                     new Configuration(task.mOverrideConfig), r.compat, r.launchedFromPackage,
@@ -1361,6 +1368,7 @@ public final class ActivityStackSupervisor implements DisplayListener {
         r.task.stack.setLaunchTime(r);
 
         if (app != null && app.thread != null) {
+            // 如果app已经启动
             try {
                 if ((r.info.flags&ActivityInfo.FLAG_MULTIPROCESS) == 0
                         || !"android".equals(r.info.packageName)) {
@@ -1382,6 +1390,7 @@ public final class ActivityStackSupervisor implements DisplayListener {
             // restart the application.
         }
 
+        // 如果app还未启动，则通过AMS创建应用进程,mService是AMS
         mService.startProcessLocked(r.processName, r.info.applicationInfo, true, 0,
                 "activity", r.intent.getComponent(), false, false, true);
     }

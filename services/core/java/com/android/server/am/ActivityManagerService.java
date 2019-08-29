@@ -3496,6 +3496,8 @@ public final class ActivityManagerService extends ActivityManagerNative
         long startTime = SystemClock.elapsedRealtime();
         ProcessRecord app;
         if (!isolated) {
+            // 传入的 isolated 参数为 false ，if 成立，并不是隔离的进程
+            // 根据进程名称和用户 ID 得到应用程序进程，第一次会为null 。
             app = getProcessRecordLocked(processName, info.uid, keepIfLarge);
             checkTime(startTime, "startProcess: after getProcessRecord");
 
@@ -3548,6 +3550,7 @@ public final class ActivityManagerService extends ActivityManagerNative
                 + " app=" + app + " knownToBeDead=" + knownToBeDead
                 + " thread=" + (app != null ? app.thread : null)
                 + " pid=" + (app != null ? app.pid : -1));
+        // 当进程已经被分配的 PID 时，
         if (app != null && app.pid > 0) {
             if ((!knownToBeDead && !app.killed) || app.thread == null) {
                 // We already have the app running, or are waiting for it to
@@ -3570,9 +3573,10 @@ public final class ActivityManagerService extends ActivityManagerNative
 
         String hostingNameStr = hostingName != null
                 ? hostingName.flattenToShortString() : null;
-
         if (app == null) {
+            // 应用程序进程不存在，创建新的进程
             checkTime(startTime, "startProcess: creating new process record");
+            // 创建应用程序进程
             app = newProcessRecordLocked(info, processName, isolated, isolatedUid);
             if (app == null) {
                 Slog.w(TAG, "Failed making new process record for "
@@ -3602,6 +3606,7 @@ public final class ActivityManagerService extends ActivityManagerNative
         }
 
         checkTime(startTime, "startProcess: stepping in to startProcess");
+        // 创建应用程序进程后，最终调用 startProcessLocked 方法，然后调到ActivityThread#main方法
         startProcessLocked(
                 app, hostingType, hostingNameStr, abiOverride, entryPoint, entryPointArgs);
         checkTime(startTime, "startProcess: done starting proc!");
@@ -3745,6 +3750,8 @@ public final class ActivityManagerService extends ActivityManagerNative
             Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "Start proc: " +
                     app.processName);
             checkTime(startTime, "startProcess: asking zygote to start proc");
+            // Process.start()方法的第一个参数是 entryPoint 指明入口类是ActivityThread,
+            // 那么ActivityThread 的 main 方法将在这里启动。
             Process.ProcessStartResult startResult = Process.start(entryPoint,
                     app.processName, uid, uid, gids, debugFlags, mountExternal,
                     app.info.targetSdkVersion, app.info.seinfo, requiredAbi, instructionSet,
@@ -6447,6 +6454,7 @@ public final class ActivityManagerService extends ActivityManagerNative
         // providers when user is unlocked later
         app.unlocked = StorageManager.isUserKeyUnlocked(app.userId);
 
+        // 移除超时消息，应用程序在规定时间内完成了启动。
         mHandler.removeMessages(PROC_START_TIMEOUT_MSG, app);
 
         boolean normalMode = mProcessesReady || isAllowedWhileBooting(app.info);
@@ -6517,6 +6525,8 @@ public final class ActivityManagerService extends ActivityManagerNative
             }
             ProfilerInfo profilerInfo = profileFile == null ? null
                     : new ProfilerInfo(profileFile, profileFd, samplingInterval, profileAutoStop);
+            // 序号1. **************** IPC 调用 ActivityThread,绑定并创建Application ****************
+            // 这是一个远程调用，但最终会调用ApplicationThread的bindApplication函数完成绑定过程
             thread.bindApplication(processName, appInfo, providers, app.instrumentationClass,
                     profilerInfo, app.instrumentationArguments, app.instrumentationWatcher,
                     app.instrumentationUiAutomationConnection, testMode,
@@ -6549,6 +6559,7 @@ public final class ActivityManagerService extends ActivityManagerNative
         boolean didSomething = false;
 
         // See if the top visible activity is waiting to run in this process...
+        // 序号2. ************************** 调度 Activity **************************
         if (normalMode) {
             try {
                 if (mStackSupervisor.attachApplicationLocked(app)) {
@@ -6561,6 +6572,7 @@ public final class ActivityManagerService extends ActivityManagerNative
         }
 
         // Find any services that should be running in this process...
+        // 序号3 ************************** 调度 Service **************************
         if (!badApp) {
             try {
                 didSomething |= mServices.attachApplicationLocked(app, processName);
@@ -6571,6 +6583,7 @@ public final class ActivityManagerService extends ActivityManagerNative
         }
 
         // Check if a next-broadcast receiver is in this process...
+        // 序号4 ************************** 调度 Broadcast **************************
         if (!badApp && isPendingBroadcastProcessLocked(pid)) {
             try {
                 didSomething |= sendPendingBroadcastsLocked(app);

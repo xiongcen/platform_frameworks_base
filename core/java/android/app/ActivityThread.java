@@ -640,6 +640,8 @@ public final class ActivityThread {
 
     private native void dumpGraphicsInfo(FileDescriptor fd);
 
+    // 因为 ApplicationThreadNative 继承 Binder，且 ApplicationThreadNative 是抽象类，
+    // 所以 ApplicationThread 才是真正的Binder实现。
     private class ApplicationThread extends ApplicationThreadNative {
         private static final String DB_INFO_FORMAT = "  %8s %8s %14s %14s  %s";
 
@@ -2522,12 +2524,14 @@ public final class ActivityThread {
     private Activity performLaunchActivity(ActivityClientRecord r, Intent customIntent) {
         // System.out.println("##### [" + System.currentTimeMillis() + "] ActivityThread.performLaunchActivity(" + r + ")");
 
+        // 获取ActivityInfo信息
         ActivityInfo aInfo = r.activityInfo;
         if (r.packageInfo == null) {
             r.packageInfo = getPackageInfo(aInfo.applicationInfo, r.compatInfo,
                     Context.CONTEXT_INCLUDE_CODE);
         }
 
+        // 获取要启动的Activity的组件信息
         ComponentName component = r.intent.getComponent();
         if (component == null) {
             component = r.intent.resolveActivity(
@@ -2535,11 +2539,13 @@ public final class ActivityThread {
             r.intent.setComponent(component);
         }
 
+        // 根据相关信息构建组件对象
         if (r.activityInfo.targetActivity != null) {
             component = new ComponentName(r.activityInfo.packageName,
                     r.activityInfo.targetActivity);
         }
 
+        // 通过反射 新建一个 Activity 对象
         Activity activity = null;
         try {
             java.lang.ClassLoader cl = r.packageInfo.getClassLoader();
@@ -2560,6 +2566,7 @@ public final class ActivityThread {
         }
 
         try {
+            // 再次确认Application对象是否创建，如果需要但没有创建，进行创建
             Application app = r.packageInfo.makeApplication(false, mInstrumentation);
 
             if (localLOGV) Slog.v(TAG, "Performing launch of " + r);
@@ -2571,8 +2578,10 @@ public final class ActivityThread {
                     + ", dir=" + r.packageInfo.getAppDir());
 
             if (activity != null) {
+                // 创建 Activity的 ContextImpl ，作为 Activity 的运行上下文环境
                 Context appContext = createBaseContextForActivity(r, activity);
                 CharSequence title = r.activityInfo.loadLabel(appContext.getPackageManager());
+                // 构造Configuration对象
                 Configuration config = new Configuration(mCompatConfiguration);
                 if (r.overrideConfig != null) {
                     config.updateFrom(r.overrideConfig);
@@ -2585,6 +2594,7 @@ public final class ActivityThread {
                     r.mPendingRemoveWindow = null;
                     r.mPendingRemoveWindowManager = null;
                 }
+                // ******** 重要 ： Activity.attach(),把上面这些重要对象都设置为activity的成员变量。********
                 activity.attach(appContext, this, getInstrumentation(), r.token,
                         r.ident, app, r.intent, r.activityInfo, title, r.parent,
                         r.embeddedID, r.lastNonConfigurationInstances, config,
@@ -2595,12 +2605,15 @@ public final class ActivityThread {
                 }
                 r.lastNonConfigurationInstances = null;
                 activity.mStartedActivity = false;
+                // 设置主题
                 int theme = r.activityInfo.getThemeResource();
                 if (theme != 0) {
                     activity.setTheme(theme);
                 }
 
                 activity.mCalled = false;
+                // 根据是否需要持久化调用此方法通知Activity已被创建和启动
+                // 回调 Activity 的 onCreate 函数
                 if (r.isPersistable()) {
                     mInstrumentation.callActivityOnCreate(activity, r.state, r.persistentState);
                 } else {
@@ -2614,10 +2627,12 @@ public final class ActivityThread {
                 r.activity = activity;
                 r.stopped = true;
                 if (!r.activity.mFinished) {
+                    // 回调 Activity 的 onStart 函数
                     activity.performStart();
                     r.stopped = false;
                 }
                 if (!r.activity.mFinished) {
+                    // Activity 的 onRestoreInstanceState 函数
                     if (r.isPersistable()) {
                         if (r.state != null || r.persistentState != null) {
                             mInstrumentation.callActivityOnRestoreInstanceState(activity, r.state,
@@ -2629,6 +2644,7 @@ public final class ActivityThread {
                 }
                 if (!r.activity.mFinished) {
                     activity.mCalled = false;
+                    // Activity 的 OnPostCreate 函数
                     if (r.isPersistable()) {
                         mInstrumentation.callActivityOnPostCreate(activity, r.state,
                                 r.persistentState);
@@ -2644,6 +2660,7 @@ public final class ActivityThread {
             }
             r.paused = true;
 
+            // 存储key-value对应，方便其他handle处理获取ActivityClientRecord
             mActivities.put(r.token, r);
 
         } catch (SuperNotCalledException e) {
@@ -2656,7 +2673,7 @@ public final class ActivityThread {
                     + ": " + e.toString(), e);
             }
         }
-
+        // 返回创建并初始化过的activity对象
         return activity;
     }
 
@@ -2712,12 +2729,14 @@ public final class ActivityThread {
         // Initialize before creating the activity
         WindowManagerGlobal.initialize();
 
+        // performLaunchActivity 将 Activity 组件启动起来
         Activity a = performLaunchActivity(r, customIntent);
 
         if (a != null) {
             r.createdConfig = new Configuration(mConfiguration);
             reportSizeConfigurations(r);
             Bundle oldState = r.state;
+            // handleResumeActivity 方法将 Activity 组件的状态设置为 Resumed。
             handleResumeActivity(r.token, false, r.isForward,
                     !r.activity.mFinished && !r.startsNotResumed, r.lastProcessedSeq, reason);
 
@@ -3544,6 +3563,7 @@ public final class ActivityThread {
                 r.activity.mVisibleFromServer = true;
                 mNumVisibleActivities++;
                 if (r.activity.mVisibleFromClient) {
+                    // ***** 重要！！ 将DecorView添加到当前Window上的关键
                     r.activity.makeVisible();
                 }
             }
@@ -5084,6 +5104,7 @@ public final class ActivityThread {
         }
 
         // send up app name; do this *before* waiting for debugger
+        // 设置进程名
         Process.setArgV0(data.processName);
         android.ddm.DdmHandleAppName.setAppName(data.processName,
                                                 UserHandle.myUserId());
@@ -5270,6 +5291,7 @@ public final class ActivityThread {
             ii = null;
         }
 
+        // 1.创建 Android 运行环境 ContextImpl .
         final ContextImpl appContext = ContextImpl.createAppContext(this, data.info);
         updateLocaleListFromAppContext(appContext,
                 mResourcesManager.getConfiguration().getLocales());
@@ -5305,6 +5327,7 @@ public final class ActivityThread {
         Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
 
         // Continue loading instrumentation.
+
         if (ii != null) {
             final ApplicationInfo instrApp = new ApplicationInfo();
             ii.copyTo(instrApp);
@@ -5313,6 +5336,7 @@ public final class ActivityThread {
                     appContext.getClassLoader(), false, true, false);
             final ContextImpl instrContext = ContextImpl.createAppContext(this, pi);
 
+            // 2.初始化 Intrumentation 对象
             try {
                 final ClassLoader cl = instrContext.getClassLoader();
                 mInstrumentation = (Instrumentation)
@@ -5353,6 +5377,7 @@ public final class ActivityThread {
         try {
             // If the app is being launched for full backup or restore, bring it up in
             // a restricted environment with the base application class.
+            // 3.创建 Application 对象
             Application app = data.info.makeApplication(data.restrictedBackupMode, null);
             mInitialApplication = app;
 
@@ -5909,7 +5934,9 @@ public final class ActivityThread {
     private void attach(boolean system) {
         sCurrentActivityThread = this;
         mSystemThread = system;
+        // 是否为系统进程
         if (!system) {
+            // 非系统进程
             ViewRootImpl.addFirstDrawHandler(new Runnable() {
                 @Override
                 public void run() {
@@ -5919,6 +5946,9 @@ public final class ActivityThread {
             android.ddm.DdmHandleAppName.setAppName("<pre-initialized>",
                                                     UserHandle.myUserId());
             RuntimeInit.setApplicationObject(mAppThread.asBinder());
+            // 将ApplicationThread通过Binder驱动"传递"到远程AMS,也就是绑定，
+            // 主要是为了让AMS能通过ApplicationThread的代理ApplicationThreadProxy来调用ApplicationThread的方法，
+            // 而本地应用程序通过ActivityManagerProxy来调用远程ActivityManagerService的方法，相当于应用程序与AMS的通信窗口。
             final IActivityManager mgr = ActivityManagerNative.getDefault();
             try {
                 mgr.attachApplication(mAppThread);
@@ -6079,8 +6109,10 @@ public final class ActivityThread {
 
         Process.setArgV0("<pre-initialized>");
 
+        // 初始化主线程的消息队列
         Looper.prepareMainLooper();
 
+        // 新建一个ActivityThread并调用attach(false)
         ActivityThread thread = new ActivityThread();
         thread.attach(false);
 
@@ -6095,6 +6127,7 @@ public final class ActivityThread {
 
         // End of event ActivityThreadMain.
         Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
+        // 开启消息循环
         Looper.loop();
 
         throw new RuntimeException("Main thread loop unexpectedly exited");

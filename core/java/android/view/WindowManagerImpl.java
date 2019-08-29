@@ -54,6 +54,7 @@ import java.util.List;
  * @hide
  */
 public final class WindowManagerImpl implements WindowManager {
+    // 单例对象
     private final WindowManagerGlobal mGlobal = WindowManagerGlobal.getInstance();
     private final Context mContext;
     private final Window mParentWindow;
@@ -90,7 +91,7 @@ public final class WindowManagerImpl implements WindowManager {
     @Override
     public void addView(@NonNull View view, @NonNull ViewGroup.LayoutParams params) {
         applyDefaultToken(params);
-        // mParentWindow是Activity中获取WindowManagerImpl实例化时传入的当前Window
+        // mParentWindow是Activity中获取WindowManagerImpl实例化时传入的当前Window，（代码查看起来为null？）
         // view是Activity中最顶层的mDecor
         mGlobal.addView(view, params, mContext.getDisplay(), mParentWindow);
     }
