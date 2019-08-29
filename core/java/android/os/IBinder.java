@@ -82,6 +82,12 @@ import java.io.FileDescriptor;
  * 
  * @see Binder
  */
+
+/**
+ * 它代表了一种跨进程传输的能力；只要实现了这个接口，就能将这个对象进行跨进程传递；
+ * 这是驱动底层支持的；在跨进程数据流经驱动的时候，驱动会识别IBinder类型的数据，
+ * 从而自动完成不同进程Binder本地对象以及Binder代理对象的转换。
+ */
 public interface IBinder {
     /**
      * The first transaction code available for user commands.

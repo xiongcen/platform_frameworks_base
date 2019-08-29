@@ -48,11 +48,25 @@ import java.util.List;
 import java.util.Map;
 
 /** {@hide} */
+
+/**
+ * ApplicationThreadNative 继承自 Binder ，意味着 ApplicationThreadNative 是一个 Binder 本地对象，
+ * 实现了 IApplicationThread 接口，IApplicationThread 本身一个 IInterface， 因此 ApplicationThreadNative
+ * 携带某种客户端需要的能力。
+ *
+ * ApplicationThreadNative 采用继承 Binder 的方式，是因为 ApplicationThreadNative 本身就是一个 Binder，
+ * 是一个能跨越进程边界传输的对象，它得实现transact这个函数从而得到跨越进程的能力（这个能力由驱动赋予）。
+ */
 public abstract class ApplicationThreadNative extends Binder
         implements IApplicationThread {
     /**
      * Cast a Binder object into an application thread interface, generating
      * a proxy if needed.
+     */
+    /**
+     * obj 对象是驱动给我们的，如果 obj 是 Binder 本地对象，那么它就是 Binder 类型；如果 obj 是 Binder 代理对象，那就是 BinderProxy 类型；
+     * 如注释描述，它会试着查找 Binder 本地对象，如果找到，说明 Client 和 Server 都在同一个进程，这个参数直接就是本地对象，直接强制类型转换返回；
+     * 如果找不到，说明是远程对象，那么就需要创建一个 Binder 代理对象，让这个代理实现对远程对象的访问。
      */
     static public IApplicationThread asInterface(IBinder obj) {
         if (obj == null) {
@@ -71,6 +85,10 @@ public abstract class ApplicationThreadNative extends Binder
         attachInterface(this, descriptor);
     }
 
+    /**
+     * 该方法运行在服务端中的Binder线程池中。
+     * 当客户端发起跨进程请求时，远程请求会通过系统底层封装后交由此方法来处理。
+     */
     @Override
     public boolean onTransact(int code, Parcel data, Parcel reply, int flags)
             throws RemoteException {
@@ -769,9 +787,15 @@ public abstract class ApplicationThreadNative extends Binder
     }
 }
 
+/**
+ * Binder 代理对象，远程方法的调用靠 Binder 代理对象完成。
+ */
 class ApplicationThreadProxy implements IApplicationThread {
     private final IBinder mRemote;
 
+    /**
+     * 执行 ApplicationThreadProxy 的构造方法，足以说明 remote 实际类型也应该是 BinderProxy。
+     */
     public ApplicationThreadProxy(IBinder remote) {
         mRemote = remote;
     }
