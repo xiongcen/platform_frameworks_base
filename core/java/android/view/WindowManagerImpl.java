@@ -91,7 +91,7 @@ public final class WindowManagerImpl implements WindowManager {
     @Override
     public void addView(@NonNull View view, @NonNull ViewGroup.LayoutParams params) {
         applyDefaultToken(params);
-        // mParentWindow是Activity中获取WindowManagerImpl实例化时传入的当前Window，（代码查看起来为null？）
+        // mParentWindow是Activity中获取WindowManagerImpl实例化时传入的当前Window(就是PhoneWindow)
         // view是Activity中最顶层的mDecor
         mGlobal.addView(view, params, mContext.getDisplay(), mParentWindow);
     }

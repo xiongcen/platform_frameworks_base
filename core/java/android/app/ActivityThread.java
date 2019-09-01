@@ -3409,6 +3409,7 @@ public final class ActivityThread {
                     deliverResults(r, r.pendingResults);
                     r.pendingResults = null;
                 }
+                // 调用Activity的onResume方法
                 r.activity.performResume();
 
                 // If there is a pending local relaunch that was requested when the activity was
@@ -3499,10 +3500,12 @@ public final class ActivityThread {
             }
             if (r.window == null && !a.mFinished && willBeVisible) {
                 r.window = r.activity.getWindow();
+                // 创建PhoneWindow中的DecorView，对象为decor
                 View decor = r.window.getDecorView();
                 decor.setVisibility(View.INVISIBLE);
                 ViewManager wm = a.getWindowManager();
                 WindowManager.LayoutParams l = r.window.getAttributes();
+                // 将decor赋值给Activity的mDecor，为后面将DecorView和Window关联做准备
                 a.mDecor = decor;
                 l.type = WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
                 l.softInputMode |= forwardBit;

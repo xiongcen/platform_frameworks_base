@@ -17511,11 +17511,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     @SuppressWarnings({"unchecked"})
     public void layout(int l, int t, int r, int b) {
+        // 如果设置了PFLAG3_MEASURE_NEEDED_BEFORE_LAYOUT标志位，那么在布局之前先进行测量，调用onMeasure函数
         if ((mPrivateFlags3 & PFLAG3_MEASURE_NEEDED_BEFORE_LAYOUT) != 0) {
             onMeasure(mOldWidthMeasureSpec, mOldHeightMeasureSpec);
             mPrivateFlags3 &= ~PFLAG3_MEASURE_NEEDED_BEFORE_LAYOUT;
         }
 
+        // 保存原始坐标
         int oldL = mLeft;
         int oldT = mTop;
         int oldB = mBottom;
@@ -17527,10 +17529,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
         // 需要重新layout
         if (changed || (mPrivateFlags & PFLAG_LAYOUT_REQUIRED) == PFLAG_LAYOUT_REQUIRED) {
-            // 回调onLayout()
+            // 回调onLayout(),如果该Vie是个ViewGroup。onLayout中需要依次调用子控件的layout方法
             onLayout(changed, l, t, r, b);
+            // 清除PFLAG_LAYOUT_REQUIRED标记
             mPrivateFlags &= ~PFLAG_LAYOUT_REQUIRED;
 
+            // 通知每一个对此控件布局变化有兴趣的Listener
             ListenerInfo li = mListenerInfo;
             if (li != null && li.mOnLayoutChangeListeners != null) {
                 ArrayList<OnLayoutChangeListener> listenersCopy =
@@ -19745,7 +19749,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             int cacheIndex = forceLayout ? -1 : mMeasureCache.indexOfKey(key);
             if (cacheIndex < 0 || sIgnoreMeasureCache) {
                 // measure ourselves, this should set the measured dimension flag back
-                // 回调onMeasure()
+                /**
+                 * 回调onMeasure()，对本控件进行测量
+                 */
                 onMeasure(widthMeasureSpec, heightMeasureSpec);
                 mPrivateFlags3 &= ~PFLAG3_MEASURE_NEEDED_BEFORE_LAYOUT;
             } else {
@@ -19757,7 +19763,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
             // flag not set, setMeasuredDimension() was not invoked, we raise
             // an exception to warn the developer
-            // onMeasure()方法后必须调用setMeasuredDimension()方法，否则会抛出异常
+            /**
+             * 检查onMeasure的实现是否调用了setMeasuredDimension()，否则会抛出异常
+             */
             if ((mPrivateFlags & PFLAG_MEASURED_DIMENSION_SET) != PFLAG_MEASURED_DIMENSION_SET) {
                 throw new IllegalStateException("View with id " + getId() + ": "
                         + getClass().getName() + "#onMeasure() did not set the"
@@ -19765,7 +19773,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                         + " setMeasuredDimension()");
             }
 
-            // 下一步是layout了，添加LAYOUT_REQUIRED标记
+            // 将PFLAG_LAYOUT_REQUIRED加入mPrivateFlags ，这一操作会对之后的布局操作放行
             mPrivateFlags |= PFLAG_LAYOUT_REQUIRED;
         }
 
@@ -19903,8 +19911,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * optionally the bit {@link #MEASURED_STATE_TOO_SMALL} set if the
      * resulting size is smaller than the size the view wants to be.
      *
-     * @param size How big the view wants to be.
-     * @param measureSpec Constraints imposed by the parent.
+     * @param size How big the view wants to be. 容器期望大小
+     * @param measureSpec Constraints imposed by the parent. View自己的规格(根据父View，padding和自己设置的layoutparams得出的结果)
      * @param childMeasuredState Size information bit mask for the view's
      *                           children.
      * @return Size information bit mask as defined by
@@ -19917,6 +19925,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         final int result;
         switch (specMode) {
             case MeasureSpec.AT_MOST:
+                // AT_MOST取小值
                 if (specSize < size) {
                     result = specSize | MEASURED_STATE_TOO_SMALL;
                 } else {
@@ -19924,10 +19933,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 }
                 break;
             case MeasureSpec.EXACTLY:
+                // EXACTLY取原值
                 result = specSize;
                 break;
             case MeasureSpec.UNSPECIFIED:
             default:
+                // UNSPECIFIED取容器期望值
                 result = size;
         }
         return result | (childMeasuredState & MEASURED_STATE_MASK);

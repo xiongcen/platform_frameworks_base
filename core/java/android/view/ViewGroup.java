@@ -6145,7 +6145,7 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
         // 获取子视图的LayoutParams
         final MarginLayoutParams lp = (MarginLayoutParams) child.getLayoutParams();
 
-        // 调整MeasureSpec，通过这两个参数以及子视图本身的LayoutParams来共同决定子视图的测量规格
+        // 调整MeasureSpec，通过这两个参数以及子视图本身的LayoutParams来共同决定子视图的测量规measureChildWithMargins格
         final int childWidthMeasureSpec = getChildMeasureSpec(parentWidthMeasureSpec,
                 mPaddingLeft + mPaddingRight + lp.leftMargin + lp.rightMargin
                         + widthUsed, lp.width);

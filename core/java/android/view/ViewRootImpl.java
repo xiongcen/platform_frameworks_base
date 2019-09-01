@@ -16,14 +16,6 @@
 
 package android.view;
 
-import static android.view.WindowCallbacks.RESIZE_MODE_DOCKED_DIVIDER;
-import static android.view.WindowCallbacks.RESIZE_MODE_FREEFORM;
-import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_FORCE_DECOR_VIEW_VISIBILITY;
-import static android.view.WindowManager.LayoutParams.TYPE_DOCK_DIVIDER;
-import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD;
-import static android.view.WindowManager.LayoutParams.TYPE_STATUS_BAR_PANEL;
-import static android.view.WindowManager.LayoutParams.TYPE_VOLUME_OVERLAY;
-
 import android.Manifest;
 import android.animation.LayoutTransition;
 import android.annotation.NonNull;
@@ -102,6 +94,14 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.concurrent.CountDownLatch;
 
+import static android.view.WindowCallbacks.RESIZE_MODE_DOCKED_DIVIDER;
+import static android.view.WindowCallbacks.RESIZE_MODE_FREEFORM;
+import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_FORCE_DECOR_VIEW_VISIBILITY;
+import static android.view.WindowManager.LayoutParams.TYPE_DOCK_DIVIDER;
+import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD;
+import static android.view.WindowManager.LayoutParams.TYPE_STATUS_BAR_PANEL;
+import static android.view.WindowManager.LayoutParams.TYPE_VOLUME_OVERLAY;
+
 /**
  * The top of a view hierarchy, implementing the needed protocol between View
  * and the WindowManager.  This is for the most part an internal implementation
@@ -177,6 +177,9 @@ public final class ViewRootImpl implements ViewParent,
 
     final WindowLeaked mLocation;
 
+    /**
+     * 构造方法将width和heigt默认设置为LayoutParams.MATCH_PARENT
+     */
     final WindowManager.LayoutParams mWindowAttributes = new WindowManager.LayoutParams();
 
     final W mWindow;
@@ -409,6 +412,8 @@ public final class ViewRootImpl implements ViewParent,
 
     public ViewRootImpl(Context context, Display display) {
         mContext = context;
+        // 从WindowManagerGlobal 中获取一个IWindowSession的实例。
+        // 它是ViewRootImpl和WindowManagerService（以下简称WMS）进行通信的代理
         mWindowSession = WindowManagerGlobal.getWindowSession();
         mDisplay = display;
         mBasePackageName = context.getBasePackageName();
@@ -420,6 +425,18 @@ public final class ViewRootImpl implements ViewParent,
         mDirty = new Rect();
         mTempRect = new Rect();
         mVisRect = new Rect();
+        /** mWinFrame，描述了当前窗口的位置和尺寸。与WMS中WindowState.mFrame保持着一致 */
+        /**
+         * mWinFrame、mPendingContentInset、mPendingVisibleInset以及mWidth，mHeight。这几个成员存储了窗口布局相关的信息。
+         * 其中mWinFrame、mPendingConentInsets、mPendingVisibleInsets与窗口在WMS中的Frame、ContentInsets、VisibleInsets是保持同步的。
+         * 这是因为这3个成员不仅会作为 relayoutWindow()的传出参数，而且ViewRootImpl在收到来自WMS的回调IWindow.Stub.resize()时，
+         * 立即更新这3个成员的取值。因此这3个成员体现了窗口在WMS中的最新状态。
+         * ---重要!!---
+         * 与mWinFrame中的记录窗口在WMS中的尺寸不同的是，mWidth/mHeight记录了窗口在ViewRootImpl中的尺寸，
+         * 二者在绝大多数情况下是相同的。当窗口在WMS中被重新布局而导致尺寸发生变化时，mWinFrame会首先被IWindow.Stub.resize()回调更新，
+         * 此时mWinFrame便会与mWidth/mHeight产生差异。此时ViewRootImpl即可得知需要对控件树进行重新布局以适应新的窗口变化。
+         * 在布局完成后，mWidth/mHeight会被赋值为mWinFrame中所保存的宽和高，二者重新统一。
+         */
         mWinFrame = new Rect();
         mWindow = new W(this);
         mTargetSdkVersion = context.getApplicationInfo().targetSdkVersion;
@@ -440,6 +457,7 @@ public final class ViewRootImpl implements ViewParent,
         mViewConfiguration = ViewConfiguration.get(context);
         mDensity = context.getResources().getDisplayMetrics().densityDpi;
         mNoncompatDensity = context.getResources().getDisplayMetrics().noncompatDensityDpi;
+        // FallbackEventHandler是一个处理未经任何人消费的输入事件的场所。
         mFallbackEventHandler = new PhoneFallbackEventHandler(context);
         mChoreographer = Choreographer.getInstance();
         mDisplayManager = (DisplayManager)context.getSystemService(Context.DISPLAY_SERVICE);
@@ -625,8 +643,14 @@ public final class ViewRootImpl implements ViewParent,
                 // Schedule the first layout -before- adding to the window
                 // manager, to make sure we do the relayout before receiving
                 // any other events from the system.
-                // 注释意思：在添加Window之前完成第一次layout布局过程，以确保在收到任何系统事件后面重新布局
+                // 注释意思：Window在添加完之前先进行一次布局，确保在接收系统的其他事件前我们有进行过布局。
+                /**
+                 * 在添加窗口之前，先通过requestLayout方法在主线程上安排一次“遍历”。
+                 * 所谓“遍历”是指ViewRootImpl中的核心方法performTraversal()。
+                 * 这个方法实现对控件树进行测量、布局、向WMS申请修改窗口属性以及重绘的所有工作。
+                 */
                 requestLayout();
+                // 初始化mInputChanel。InputChannel是窗口接收来自InputDispatcher的输入事件的管道。
                 if ((mWindowAttributes.inputFeatures
                         & WindowManager.LayoutParams.INPUT_FEATURE_NO_INPUT_CHANNEL) == 0) {
                     mInputChannel = new InputChannel();
@@ -637,7 +661,11 @@ public final class ViewRootImpl implements ViewParent,
                     mOrigWindowType = mWindowAttributes.type;
                     mAttachInfo.mRecomputeGlobalAttributes = true;
                     collectViewAttributes();
-                    // 最终通过WindowSession最终完成Window的添加过程
+                    /**
+                     * mWindowSession是个Binder类，它的实现类是Session，
+                     * 将通过IPC远程调用（即调用另一个进程中的）Session的addToDisplay方法把窗口添加进WMS中。
+                     * 完成这个操作后，mWindow已经被添加到指定对象中而且mInputChannel（如果不为空）已经准备好接收事件
+                     */
                     res = mWindowSession.addToDisplay(mWindow, mSeq, mWindowAttributes,
                             getHostVisibility(), mDisplay.getDisplayId(),
                             mAttachInfo.mContentInsets, mAttachInfo.mStableInsets,
@@ -668,6 +696,7 @@ public final class ViewRootImpl implements ViewParent,
                         (res & WindowManagerGlobal.ADD_FLAG_ALWAYS_CONSUME_NAV_BAR) != 0;
                 mPendingAlwaysConsumeNavBar = mAttachInfo.mAlwaysConsumeNavBar;
                 if (DEBUG_LAYOUT) Log.v(mTag, "Added window " + mWindow);
+                // 错误处理。窗口添加失败的原因通常是是权限问题、重复添加或者token无效
                 if (res < WindowManagerGlobal.ADD_OKAY) {
                     mAttachInfo.mRootView = null;
                     mAdded = false;
@@ -720,6 +749,7 @@ public final class ViewRootImpl implements ViewParent,
                     mInputQueueCallback =
                         ((RootViewSurfaceTaker)view).willYouTakeTheInputQueue();
                 }
+                // 如果mInputChannel不为空，则创建mInputEventReceiver用于接收输入事件。
                 if (mInputChannel != null) {
                     if (mInputQueueCallback != null) {
                         mInputQueue = new InputQueue();
@@ -1309,42 +1339,56 @@ public final class ViewRootImpl implements ViewParent,
             final Resources res, final int desiredWindowWidth, final int desiredWindowHeight) {
         int childWidthMeasureSpec;
         int childHeightMeasureSpec;
+        // 表示是否可能导致窗口的尺寸变化
         boolean windowSizeMayChange = false;
 
         if (DEBUG_ORIENTATION || DEBUG_LAYOUT) Log.v(mTag,
                 "Measuring " + host + " in display " + desiredWindowWidth
                 + "x" + desiredWindowHeight + "...");
 
+        /**
+         * 表示测量是否能满足控件树充分显示内容的要求
+         */
         boolean goodMeasure = false;
         if (lp.width == ViewGroup.LayoutParams.WRAP_CONTENT) {
             // On large screens, we don't want to allow dialogs to just
             // stretch to fill the entire width of the screen to display
             // one line of text.  First try doing the layout at a smaller
             // size to see if it will fit.
+            /**
+             * 第一次协商，measureHierarchy使用它期望的宽度进行测量
+             */
             final DisplayMetrics packageMetrics = res.getDisplayMetrics();
             res.getValue(com.android.internal.R.dimen.config_prefDialogWidth, mTmpValue, true);
+            // 宽度限制保存在baseSize中
             int baseSize = 0;
             if (mTmpValue.type == TypedValue.TYPE_DIMENSION) {
                 baseSize = (int)mTmpValue.getDimension(packageMetrics);
             }
             if (DEBUG_DIALOG) Log.v(mTag, "Window " + mView + ": baseSize=" + baseSize
                     + ", desiredWindowWidth=" + desiredWindowWidth);
+            // 如果宽度限制不为0并且传入的desiredWindowWidth 大于measureHierarchy期望的限制宽度，
             if (baseSize != 0 && desiredWindowWidth > baseSize) {
                 childWidthMeasureSpec = getRootMeasureSpec(baseSize, lp.width);
                 childHeightMeasureSpec = getRootMeasureSpec(desiredWindowHeight, lp.height);
+                // 第一次测量 使用measureHierarchy期望的限制宽度 并得到状态
                 performMeasure(childWidthMeasureSpec, childHeightMeasureSpec);
                 if (DEBUG_DIALOG) Log.v(mTag, "Window " + mView + ": measured ("
                         + host.getMeasuredWidth() + "," + host.getMeasuredHeight()
                         + ") from width spec: " + MeasureSpec.toString(childWidthMeasureSpec)
                         + " and height spec: " + MeasureSpec.toString(childHeightMeasureSpec));
+                // 判断状态
                 if ((host.getMeasuredWidthAndState()&View.MEASURED_STATE_TOO_SMALL) == 0) {
+                    // 对测量结果满意
                     goodMeasure = true;
                 } else {
                     // Didn't fit in that size... try expanding a bit.
+                    // 对测量结果不满意，进行二次协商，这次把限制宽度放大为期望宽度baseSize和最大宽度desiredWindowWidth和的一半
                     baseSize = (baseSize+desiredWindowWidth)/2;
                     if (DEBUG_DIALOG) Log.v(mTag, "Window " + mView + ": next baseSize="
                             + baseSize);
                     childWidthMeasureSpec = getRootMeasureSpec(baseSize, lp.width);
+                    // 第二次测量
                     performMeasure(childWidthMeasureSpec, childHeightMeasureSpec);
                     if (DEBUG_DIALOG) Log.v(mTag, "Window " + mView + ": measured ("
                             + host.getMeasuredWidth() + "," + host.getMeasuredHeight() + ")");
@@ -1356,10 +1400,13 @@ public final class ViewRootImpl implements ViewParent,
             }
         }
 
+        // 如果两次协商测量均不能让控件树满意，那么measureHierarchy不再对宽度进行限制，使用最大宽度进行测量
         if (!goodMeasure) {
             childWidthMeasureSpec = getRootMeasureSpec(desiredWindowWidth, lp.width);
             childHeightMeasureSpec = getRootMeasureSpec(desiredWindowHeight, lp.height);
+            // 第三次测量
             performMeasure(childWidthMeasureSpec, childHeightMeasureSpec);
+            // 如果测量得到的宽度或者高度与ViewRootImpl中的窗口不一致，那么之后可能要改变窗口的尺寸了
             if (mWidth != host.getMeasuredWidth() || mHeight != host.getMeasuredHeight()) {
                 windowSizeMayChange = true;
             }
@@ -1452,11 +1499,17 @@ public final class ViewRootImpl implements ViewParent,
 
         mIsInTraversal = true;
         mWillDrawSoon = true;
+        /**
+         * 第1阶段 预测量开始
+         */
         boolean windowSizeMayChange = false;
         boolean newSurface = false;
         boolean surfaceChanged = false;
         WindowManager.LayoutParams lp = mWindowAttributes;
 
+        /**
+         * 这两个变量将是mView的SPEC_SIZE分量的候选
+         */
         int desiredWindowWidth;
         int desiredWindowHeight;
 
@@ -1488,18 +1541,26 @@ public final class ViewRootImpl implements ViewParent,
         mWindowAttributesChangesFlag = 0;
 
         Rect frame = mWinFrame;
-        // 2.判断是否是第一次遍历
+        /**
+         * ViewRootImpl被创建时mFirst被赋值为true，判断是否是第一次"遍历"
+         */
         if (mFirst) {
             mFullRedrawNeeded = true;
             mLayoutRequested = true;
 
             if (shouldUseDisplaySize(lp)) {
                 // NOTE -- system code, won't try to do compat mode.
+                /**
+                 * 为状态栏设置desiredWindowWidth/height 其取值是屏幕尺寸
+                 */
                 Point size = new Point();
                 mDisplay.getRealSize(size);
                 desiredWindowWidth = size.x;
                 desiredWindowHeight = size.y;
             } else {
+                /**
+                 * 第1次“遍历”的测量，采用了应用可以使用的最大尺寸作为SPEC_SIZE的候选
+                 */
                 Configuration config = mContext.getResources().getConfiguration();
                 desiredWindowWidth = dipToPx(config.screenWidthDp);
                 desiredWindowHeight = dipToPx(config.screenHeightDp);
@@ -1518,28 +1579,33 @@ public final class ViewRootImpl implements ViewParent,
             if (mViewLayoutDirectionInitial == View.LAYOUT_DIRECTION_INHERIT) {
                 host.setLayoutDirection(mLastConfiguration.getLayoutDirection());
             }
-            // 3.如果是第一次遍历，就调用dispatchAttachedToWindow，所有子视图都把mAttachInfo的值复制到自己的mAttachInfo中
+            // 如果是第一次遍历，就调用dispatchAttachedToWindow，所有子视图都把mAttachInfo的值复制到自己的mAttachInfo中
             host.dispatchAttachedToWindow(mAttachInfo, 0);
             mAttachInfo.mTreeObserver.dispatchOnWindowAttachedChange(true);
             dispatchApplyInsets(host);
             //Log.i(mTag, "Screen on initialized: " + attachInfo.mKeepScreenOn);
 
         } else {
+            /**
+             * 在非第一次"遍历"的情况下，会采用窗口的最新尺寸最为SPEC_SIZE的候选
+             */
             desiredWindowWidth = frame.width();
             desiredWindowHeight = frame.height();
-            // 4.如果不是第一次，判断窗口大小是否有变化，如果有，则会将下面三个变量置为true。
+            /**
+             * 如果窗口的最新尺寸与ViewRootImpl中的现有尺寸不同，说明WMS单方面改变了窗口的尺寸，将导致以下3个结果
+             */
             if (desiredWindowWidth != mWidth || desiredWindowHeight != mHeight) {
                 if (DEBUG_ORIENTATION) Log.v(mTag, "View " + host + " resized to: " + frame);
-                // 需要全部重绘
+                // 需要全部重绘以适应新的窗口尺寸
                 mFullRedrawNeeded = true;
                 // 需要重新布局即重新为视图指定位置
                 mLayoutRequested = true;
-                // 窗口大小可能改变
+                // 控件树可能拒绝接受新的窗口尺寸，可能需要窗口在布局阶段尝试设置新的窗口尺寸，只是尝试
                 windowSizeMayChange = true;
             }
         }
 
-        // 5.如果visibility发生变化，将调用host.dispatchWindowVisibilityChanged将这个变化通知给所有的子视图
+        // 如果visibility发生变化，将调用DecorView.dispatchWindowVisibilityChanged将这个变化通知给所有的子视图
         if (viewVisibilityChanged) {
             mAttachInfo.mWindowVisibility = viewVisibility;
             host.dispatchWindowVisibilityChanged(viewVisibility);
@@ -1577,6 +1643,7 @@ public final class ViewRootImpl implements ViewParent,
                 mAttachInfo.mInTouchMode = !mAddedTouchMode;
                 ensureTouchModeLocally(mAddedTouchMode);
             } else {
+                // 检查WMS是否单方面改变了一些参数，标记下来，然后作为后文是否进行控件布局的条件之一
                 if (!mPendingOverscanInsets.equals(mAttachInfo.mOverscanInsets)) {
                     insetsChanged = true;
                 }
@@ -1597,17 +1664,21 @@ public final class ViewRootImpl implements ViewParent,
                 if (mPendingAlwaysConsumeNavBar != mAttachInfo.mAlwaysConsumeNavBar) {
                     insetsChanged = true;
                 }
+                // 如果窗口的width或height被指定为WRAP_CONTENT时。表示该窗口为悬浮窗口。
                 if (lp.width == ViewGroup.LayoutParams.WRAP_CONTENT
                         || lp.height == ViewGroup.LayoutParams.WRAP_CONTENT) {
+                    // 悬浮窗口的尺寸取决于测量结果。因此有可能向WMS申请改变窗口的尺寸
                     windowSizeMayChange = true;
 
                     if (shouldUseDisplaySize(lp)) {
                         // NOTE -- system code, won't try to do compat mode.
+                        // 一样的设置状态栏的desiredWindowWidth/height
                         Point size = new Point();
                         mDisplay.getRealSize(size);
                         desiredWindowWidth = size.x;
                         desiredWindowHeight = size.y;
                     } else {
+                        // 置悬浮窗口的SPEC_SIZE的候选为应用可以使用的最大尺寸
                         Configuration config = res.getConfiguration();
                         desiredWindowWidth = dipToPx(config.screenWidthDp);
                         desiredWindowHeight = dipToPx(config.screenHeightDp);
@@ -1616,7 +1687,9 @@ public final class ViewRootImpl implements ViewParent,
             }
 
             // Ask host how big it wants to be
-            // 6.测量判断window的大小是否需要改变
+            /**
+             * 进行测量
+             */
             windowSizeMayChange |= measureHierarchy(host, lp, res,
                     desiredWindowWidth, desiredWindowHeight);
         }
@@ -1686,6 +1759,20 @@ public final class ViewRootImpl implements ViewParent,
             mLayoutRequested = false;
         }
 
+        /**
+         * 判断窗口是否需要改变尺寸
+         * 需要改变尺寸的必要条件：
+         * ---1.layoutRequested为true。表示ViewRootImpl的requestLayout方法被调用过。
+         * ①在View中也有requestLayout方法。当控件内容发生变化从而需要调整其尺寸时，会调用自身的requestLayout(),
+         * 并且此方法会沿着控件树向根部回溯，最终调用到ViewRootImpl的requestLayout，从而引发一次performTraversals()调用。
+         * ②performTraversals()还有可能因为重绘时调用，当控件仅需要重绘而不需要重新布局时（例如背景色或者前景色发生变化时），
+         * 会通过invalidate()方法回溯到ViewRootImpl，此时不会通过requestLayout触发performTraversals()调用，
+         * 而是通过scheduleTraversals()方法进行触发。这种情况下不需要进行布局窗口阶段。
+         * ---2.windowSizeMayChange为true。
+         * ---3.以下条件2选1：
+         * ①测量结果与ViewRootImpl中所保存的当前尺寸有差异
+         * ②悬浮窗口的测量结果与窗口的最新尺寸有差异
+         */
         boolean windowShouldResize = layoutRequested && windowSizeMayChange
             && ((mWidth != host.getMeasuredWidth() || mHeight != host.getMeasuredHeight())
                 || (lp.width == ViewGroup.LayoutParams.WRAP_CONTENT &&
@@ -1710,6 +1797,13 @@ public final class ViewRootImpl implements ViewParent,
         int relayoutResult = 0;
         boolean updatedConfiguration = false;
 
+        /**
+         * 第1阶段 预测量结束
+         */
+
+        /**
+         * 第2阶段 窗口布局开始
+         */
         final int surfaceGenerationId = mSurface.getGenerationId();
 
         final boolean isViewVisible = viewVisibility == View.VISIBLE;
@@ -1756,7 +1850,7 @@ public final class ViewRootImpl implements ViewParent,
                     }
                     mChoreographer.mFrameInfo.addFlags(FrameInfo.FLAG_WINDOW_LAYOUT_CHANGED);
                 }
-                // 7.重新分配窗口大小，创建Surface，并打通native层
+                // 重新分配窗口大小，创建Surface，并打通native层
                 relayoutResult = relayoutWindow(params, viewVisibility, insetsPending);
 
                 if (DEBUG_LAYOUT) Log.v(mTag, "relayout: frame=" + frame.toShortString()
@@ -2019,6 +2113,14 @@ public final class ViewRootImpl implements ViewParent,
                 }
             }
 
+            /**
+             * 第2阶段 窗口布局结束
+             */
+            /**
+             * 第3阶段 最终测量开始
+             * 最终测量阶段直接调用performMeasure而不是measureHierarchy，是因为measureHierarchy有个协商过程，
+             * 而到了最终测量阶段控件树已经没有了协商的余地，无论控件树乐意与否，他只能被迫接受WMS的布局结果。
+             */
             if (!mStopped || mReportNextDraw) {
                 boolean focusChangedDueToTouchMode = ensureTouchModeLocally(
                         (relayoutResult&WindowManagerGlobal.RELAYOUT_RES_IN_TOUCH_MODE) != 0);
@@ -2035,8 +2137,10 @@ public final class ViewRootImpl implements ViewParent,
                             + " measuredHeight=" + host.getMeasuredHeight()
                             + " framesChanged=" + framesChanged);
 
-                     // Ask host how big it wants to be
-                    // 8.计算视图大小
+                    // Ask host how big it wants to be
+                    /**
+                     * 计算视图大小
+                     */
                     performMeasure(childWidthMeasureSpec, childHeightMeasureSpec);
 
                     // Implementation of weights from WindowManager.LayoutParams
@@ -2046,6 +2150,9 @@ public final class ViewRootImpl implements ViewParent,
                     int height = host.getMeasuredHeight();
                     boolean measureAgain = false;
 
+                    /**
+                     * 判断LayoutParams.horizontalWeight和lp.verticalWeight ，以作为是否再次测量的依据
+                     */
                     if (lp.horizontalWeight > 0.0f) {
                         width += (int) ((mWidth - width) * lp.horizontalWeight);
                         childWidthMeasureSpec = MeasureSpec.makeMeasureSpec(width,
@@ -2069,6 +2176,9 @@ public final class ViewRootImpl implements ViewParent,
                     layoutRequested = true;
                 }
             }
+            /**
+             * 第3阶段 最终测量结束
+             */
         } else {
             // Not the first pass and no window/insets/visibility change but the window
             // may have moved and we need check that and if so to update the left and right
@@ -2077,17 +2187,25 @@ public final class ViewRootImpl implements ViewParent,
             // same and we do not want to translate them more than once.
             maybeHandleWindowMove(frame);
         }
-
+        /**
+         * 第4阶段 控件布局开始
+         */
+        // 布局阶段的判断条件
         final boolean didLayout = layoutRequested && (!mStopped || mReportNextDraw);
         boolean triggerGlobalLayoutListener = didLayout
                 || mAttachInfo.mRecomputeGlobalAttributes;
         if (didLayout) {
-            // 9.将布局放在合适的位置
+            /**
+             * 对控件进行布局
+             */
             performLayout(lp, mWidth, mHeight);
 
             // By this point all views have been sized and positioned
             // We can compute the transparent area
 
+            /**
+             * 如果有必要，计算窗口的透明区域并把该区域设置给WMS
+             */
             if ((host.mPrivateFlags & View.PFLAG_REQUEST_TRANSPARENT_REGIONS) != 0) {
                 // start out transparent
                 // TODO: AVOID THAT CALL BY CACHING THE RESULT?
@@ -2188,6 +2306,13 @@ public final class ViewRootImpl implements ViewParent,
             host.sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED);
         }
 
+        /**
+         * 第4阶段 控件布局结束
+         */
+
+        /**
+         * 第5阶段 绘制开始
+         */
         mFirst = false;
         mWillDrawSoon = false;
         mNewSurfaceNeeded = false;
@@ -2225,7 +2350,9 @@ public final class ViewRootImpl implements ViewParent,
                 mPendingTransitions.clear();
             }
 
-            // 10.将视图View对象绘制到屏幕上
+            /**
+             * 绘制
+             */
             performDraw();
         } else {
             if (isViewVisible) {
@@ -2624,6 +2751,7 @@ public final class ViewRootImpl implements ViewParent,
         mIsDrawing = true;
         Trace.traceBegin(Trace.TRACE_TAG_VIEW, "draw");
         try {
+            // 开始绘制
             draw(fullRedrawNeeded);
         } finally {
             mIsDrawing = false;
@@ -2843,6 +2971,7 @@ public final class ViewRootImpl implements ViewParent,
                     return;
                 }
 
+                // 开始绘制
                 if (!drawSoftware(surface, mAttachInfo, xOffset, yOffset, scalingRequired, dirty)) {
                     return;
                 }
@@ -2929,6 +3058,9 @@ public final class ViewRootImpl implements ViewParent,
                 canvas.setScreenDensity(scalingRequired ? mNoncompatDensity : 0);
                 attachInfo.mSetIgnoreDirtyState = false;
 
+                /**
+                 * 开始绘制
+                 */
                 mView.draw(canvas);
 
                 drawAccessibilityFocusedDrawableIfNeeded(canvas);
